@@ -1,0 +1,184 @@
+Round,Action,Winner,Payer,Points,Hand,Dealer,Riichi's
+E1.0,Ron,Jess,Josh,12000,Riichi Ippatsu Dora Ura Dora,Jess,Jess
+E1.1,Tsumo,Jess,"Josh,John,Aaron",3900,Rinshan Tanyao,Jess,
+E1.2,Ron,John,Josh,8000,Riichi Dora 3,Jess,"John,Aaron"
+E2.0,Ron,Jess,Aaron,3900,Haku Dora 2,John,John
+E3.0,Tsumo,Josh,"Aaron,John,Jess",6000,Menzen Tsumo Tanyao Aka Dora,Josh,
+E3.1,Tsumo,Jess,"Josh,John,Aaron",8000,Tanyao Dora 2 Aka Dora 2,Josh,
+E4.0,Ron,Aaron,Jess,18000,Riichi Pinfu Tanyao Dora Ura 2,Aaron,Aaron
+E4.1,Ron,John,Jess,8000,Riichi Ippatsu Pinfu Dora2,Aaron,John
+S1.0,Ron,Josh,Jess,2000,Honitsu,Jess,
+S2.0,Ron,Josh,John,8000,Chun Dora 3,John,
+S3.0,Tsumo,Aaron,"Josh,Jess,Josh",8000,Double Nan Dora 2 Aka Dora,Josh,
+S4.0,Ron,John,Jess,1000,Tanyao ,Aaron,Jess
+E1.1,Ryuukyoku,"Thomas,","Victor, Emily, Presten",1000,Tenpai: Thomas,,
+E1.2,Ryuukyoku,"Victor , Emily , Presten",Thomas,1000,"Tenpai: Victor , Emily, Presten",,
+E2.3,Ron,Emily,Victor,24000,Riichi Ippatsu Chiitoi Honitsu Aka Dora,,
+E2.4,Ron,Victor,Presten,3900,Riichi Aka Dora,,
+E3.0,Ron,Thomas,Victor,1000,Chun,,
+E4.0,Tsumo,Thomas,"Victor, Emily, Presten",8000,Riichi Menzen Tsumo Pinfu Tanyao Aka ,,
+S1.0,Ron,Victor,Thomas,3900,Riichi Pinfu Ura Dora,,
+S2.0,Ron,Presten,Emily,8000,Riichi Pinfu Dora 2 Aka Dora 1 ,,
+S3.0,Ron,Victor,Presten,2900,Haku Dora,,
+S3.1,Tsumo,Thomas,"Victor, Emily, Presten",5200,Riichi Tsumo Pinfu Ura Dora,,
+S4.0,Ron,Presten,Thomas,1500,Hatsu,,
+S4.1,Tsumo,Thomas,"Victor, Emily, Presten",4000,Menzen Tsumo Tanyao Dora,,
+E1.0,Ron,Presten,Josh,3900,Riichi Pinfu Dora,Emily,Presten
+E2.0,Ron,Emily,Josh,8000,Riichi Dora Ura 2,John,Emily
+E3.0,Tsumo,Josh,"John,Emily,Presten",1500,Chun,Presten,"Emily,Presten"
+E4.0,Ron,Presten,Josh,1300,Riichi Nomi,Josh,Presten
+S1.0,Ron,Josh,John,8000,Riichi Ittsu Ura,Emily,"Josh,Presten"
+S2.0,Ryuukyoku,"John,Emily","Josh,Presten",1500,,John,
+S2.1,Ron,John,Emily,18000,Riichi Ippatsu Pinfu Dora Aka Dora 2,John,John
+S2.2,Tsumo,Josh,"Emily,John,Presten",12000,Riichi Menzen Tsumo iipekiou dora Aka dora 2,John,"Josh,John"
+S3.0,Tsumo,Presten,"Josh,John,Emily",3900,Riichi Menzen Tsumo,Presten,Presten
+S3.1,Ron,John,Josh,8000,Riichi Pinfu Dora Aka ,Presten,John
+S4.0,Tsumo,John,"Josh,Emily,Presten",4000,Haku Honitsu ,Josh,
+E1.0,Ron,Thomas,Aaron,2600,Riichi Dora,Jess,Thomas
+E2.0,Ron,Victor,Thomas,8000,Tanyao Dora 3 Aka Dora,Thomas,
+E3.0,Ron,Victor,Thomas,2900,Hatsu Dora,Victor,
+E3.1,Ron,Thomas,Victor,3900,Tanyao Aka Dora 2,Victor,Jess
+E4.0,Ron,Victor,Jess,5200,Riichi Dora Aka Dora,Aaron,Victor
+S1.0,Ron,Jess,Aaron,2000,Riichi Nomi,Jess,"Jess,Aaron"
+S1.1,Tsumo,Jess,"Victor,Aaron,Thomas",2400,Haku Nomi,Jess,
+S1.2,Tsumo,Victor,"Aaron,Jess,Thomas",12000,Riichi Menzen Tsumo Pinfu Dora Aka Dora Ura Dora,Jess,Victor
+S2.0,Ron,Victor,Aaron,2000,Tanyao Dora ,Thomas,
+S3.0,Ron,Thomas,Aaron,8000,Riichi Ura 3,Victor,"Jess,Thomas"
+S4.0,Ron,Victor,Thomas,6400,Chiitoi Dora 2,Aaron,
+E1.0,Ron,John,Thomas,8000,Riichi Tanyao Aka Ura 1,Josh,John
+E2.0,Ron,Victor,Josh,12000,Double Ton Dora San,Victor,Josh
+E2.2,Ron,Thomas,John,1300,Chun,Victor,Josh
+E3.0,Ron,Victor,Thomas,5200,Riichi Ippatsu Aka,John,Victor
+E4.0,Ron,Thomas,John,12000,Riichi Double Ton Ura,Thomas,Thomas
+E4.1,Ron,Thomas,Josh,3900,Riichi Dora,Thomas,Thomas
+E4.2,Ryuukyoku,"Josh,John,Victor",Thomas,1000,Exhaustive Draw,Thomas,Josh
+S1.3,Ron,Thomas,Victor,1300,Haku,Josh,
+S2.0,Ron,John,Thomas,2000,Pinfu Aka,Victor,
+S3.0,Tsumo,John,"Josh,Thomas,Victor",7800,Menzen Tsumo Nan Dora,John,Thomas
+S3.1,Ron,Victor,Thomas,3900,Tanyao Dora 2,John,
+S4.0,Ryuukyoku,"Josh,John,Thomas",Victor,1000,Exhaustive Draw,Thomas,Josh
+S4.1,Ron,Victor,Thomas,2000,Hatsu Nan,Thomas,
+E1.0,Ron,Emily,Presten,8000,Riichi Ippatsu Pinfu Ura,Jess,"Emily,Jess"
+E2.0,Ron,Emily,Jess,2600,Riichi Ura,Aaron,Emily
+E3.0,Ron,Emily,Aaron,12000,Hatsu Dora 3,Emily,
+E3.1,Ron,Presten,Emily,1000,Chun,Emily,
+E4.0,Ron,Emily,Jess,5200,Riichi Ippatsu Dora,Presten,Emily
+S1.0,Ryuukyoku,"Emily,Jess","Aaron,Presten",1500,Exhasutive Draw,Jess,
+S1.1,Tsumo,Presten,"Aaron,Jess,Emily",24000,Riichi Ippatsu Menzen Tsumo iipekiou Chinitsu Aka ,Jess,Presten
+S2.0,Tsumo,Emily,"Aaron,Jess,Presten",5200,Riichi Tsumo Aka,Aaron,Emily
+S3.0,Ron,Presten,Aaron,3900,Double Nan Aka ,Emily,
+S4.0,Ron,Presten,Aaron,5800,Riichi Ippatsu Pinfu,Presten,Presten
+S4.1,Ron,Presten,Aaron,7700,Riichi Ippatsu Ura,Presten,Presten
+E1.0,Ron,Emily,John,1500,Hatsu Nomi,Emily,
+E1.1,Tsumo,Emily,"John,Jess,Thomas",6000,Riichi Menzen Tsumo Dora,Emily,Emily
+E1.2,Tsumo,John,"Emily,Jess,Thomas",2700,Riichi Menzen Tsumo Pinfu,Emily,John
+E2.0,Ron,Emily,Thomas,12000,Riichi Hatsu Sanankou Dora San3,Thomas,Emily
+E3.0,Tsumo,Emily,"Thomas,Jess,Emily",8000,Riichi Menzen Tsumo Haku Sha Dora,Jess,Emily
+E4.0,Ron,Jess,Emily,8000,Riichi Ippatsu Ura 3,John,"Emily,John,Jess"
+S1.0,Tsumo,John,"Emily,Jess,Thomas",12000,Riichi Ippatsu Menzen Tsumo Pinfu Tanyao Dora Ura,Emily,John
+S2.0,Tsumo,Jess,"Emily,Thomas,John",4000,Riichi Ippatsu Menzen Tsumo,Thomas,Jess
+S3.0,Tsumo,John,"Jess,Emily,Thomas",4000,Riichi Menzen Tsumo Ura 1,Jess,John
+S4.0,Ron,Emily,Jess,3900,Tanyao Sanshoku Doujin Dora,John,Thomas
+E1.0,Ryuukyoku,"Victor,Aaron","Josh,Presten",1500,Exhaustive Draw,Victor,"Presten,Victor"
+E1.1,Tsumo,Presten,"Victor,Josh,Aaron",12000,Riichi Menzen Tsumo Ittsu Dora 2 Ura 1,Victor,Presten
+E2.0,Tsumo,Aaron,"Victor,Josh,Presten",8000,Riichi Ippatsu Menzen Tsumo Chun,Josh,"Aaron,Presten"
+E3.0,Tsumo,Presten,"Josh,Aaron,Victor",8000,Riichi Menzen Tsumo Dora 2 ,Aaron,Presten
+E4.0,Ron,Presten,Victor,18000,Riichi Pinfu Dora San Aka Ura,Presten,Presten
+E4.1,Ron,Josh,Aaron,1000,Haku nomi,Presten,
+S1.0,Ron,Presten,Victor,8000,Riichi Ippatsu Dora Aka,Victor,Presten
+S2.0,Ron,Josh,Aaron,12000,Haku Hatsu Dora 2,Josh,Presten
+S2.1,Ron,Josh,Victor,1500,Nan Nomi,Josh,
+S2.2,Tsumo,Aaron,"Josh,Presten,Victor",5200,Riichi Menzen Tsumo Hatsu ,Josh,Aaron
+S3.0,Ryuukyoku,Victor,"Aaron,Presten,Josh",3000,Exhaustive Draw,Aaron,
+S4.0,Ron,Presten,Aaron,1500,Haku Nomi,Presten,
+E1.0,Ron,Jess,John,18000,Mangan - Riichi Ippatsu Pinfu Ittsu Dora,Jess,"Jess,Victor"
+E1.1,Ron,John,Presten,8000,Mangan - Riichi Pinfu Dora Aka Dora 2,Jess,John
+E2.0,Tsumo,Jess,"Victor,John,Presten",8000,Mangan - Riichi Menzen Tsumo Dora 2 Ura 1,Presten,Jess
+E3.0,Ron,John,Victor,5800,Tanyao Dora Aka ,John,
+E3.1,Ron,Presten,Victor,2000,Tanyao Aka ,John,John
+E4.0,Ron,Victor,John,2900,Tanyao Aka ,Victor,Jess
+E4.1,Ron,Victor,John,5800,Haku Dora Aka ,Victor,
+E4.2,Ryuukyoku,Presten,"Jess,Victor,John",1000,Exhaustive Draw,Victor,
+S1.3,Ron,Presten,Victor,1600,Hatsu,Jess,
+S2.0,Ryuukyoku,"Victor,Presten","Jess,John",1500,Exhaustive Draw,Presten,"Victor,Presten"
+S2.1,Ron,Victor,John,8000,Mangan - Hatsu Dora 4,Presten,
+S3.0,Tsumo,Jess,"Victor,John,Presten",8000,Mangan - Riichi Menzen Tsumo Dora Aka,John,Jess
+S4.0,Tsumo,Victor,"John,Presten,Jess",12000,Mangan- Riichi Menzen Tsumo Ura 2,Victor,Victor
+S4.1,Ron,Presten,Jess,12000,Mangan - Riichi Ippatsu Nan Dora 3 ,Victor,Presten
+E1.0,Ron,Thomas,Emily,5800,Riichi Pinfu Dora - 3 han 30,Thomas,Thomas
+E1.1,Ryuukyoku,"Thomas,Josh","Emily,Aaron",1500,Exhaustive Draw,Thomas,
+E1.2,Tsumo,Aaron,"Thomas,Emily,Josh",2000,Riichi Menzen Tsumo - 2 han 30,Thomas,Aaron
+"E2,0",Ron,Thomas,Emily,8000,MANGAN- Riichi Pinfu Dora Aka 2 - 5 han 30,Josh,Thomas
+E3.0,Tsumo,Emily,"Josh,Aaron,Thomas",12000,MANGAN - Riichi Menzen Tsumo Pinfu Dora Aka - 5 han 20,Emily,Emily
+"E3,1",Ron,Emily,Thomas,5800,Haku Dora Aka,Emily,
+E3.2,Tsumo,Emily,"Thomas,Josh,Aaron",18000,HANEMAN- Riichi Menzen Tsumo Sanshoku Doujin Dora2 Ura 1 - 7 han 40 fu,Emily,Emily
+E3.3,Ron,Thomas,Emily,2600,Riichi Ura - 2 han 40,Emily,Thomas
+E4.0,Ron,Thomas,Aaron,5200,Riichi Dora Ura - 3 han 40,Aaron,Thomas
+S1.0,Ryuukyoku,Josh,"Aaron,Emily,Thomas",0,Abortive Draw,Thomas,
+S1.1,Ron,Aaron,Thomas,6400,Riichi Ippatsu iipekiou - 3 han 50,Thomas,Aaron
+S2.0,Ron,Josh,Emily,12000,MANGAN - Riichi Pinfu Dora Aka - 4 han 30,Josh,"Josh,Emily"
+S2.1,Ron,Thomas,Josh,3900, Riichi Pinfu Ura - 3 han 30,Josh,Thomas
+S3.0,Ron,Josh,Thomas,5200,Riichi Ura 2 - 3 han 40,Emily,"Josh,Thomas"
+S4.0,Tsumo,Emily,"Aaron,Thomas,Josh",2700,Chun Dora - 2 han 40,Aaron,
+E1.0,Tsumo,Victor,"John,Emily,Aaron",1100,Hatsu nomi 1 han 30 fu,John,
+E2.0,Ron,Victor,Aaron,8000,MANGAN- Riichi Ippatsu Pinfu Tanyao Aka 5 han 30 fu ,Aaron,Victor
+E3.0,Ryuukyoku,John,"Victor,Aaron,Emily",1000,Exhaustive Draw,Emily,
+E4.1,Ron,John,Aaron,3200,Riichi Chiitoi 3 han 25,Victor,John
+S1.0,Ron,Victor,John,8000,MANGAN - Riichi Dora 2 Aka 1 Ura 1 5 han 40,John,Victor
+S2.0,Ron,John ,Aaron,5200,Nan Toitoi - 3 han 40,Aaron,
+S3.0,Ron,Aaron,Victor ,12000,HANEMAN -  Nan Toitoi Honitsu Aka 6 han 40,Emily,
+S4.0,Ron,Emily,John,8000,MANGAN - Tanyao Dora Aka 2,Victor,
+E1.0,Ron,Jess,Thomas,2000,Tanyao Aka 2 han 30 ,Presten,
+E2.0,Ron,Jess,Josh,5800,Chun Aka 2 3 han 30,Jess,Thomas
+E2.1,Ron,Presten,Jess,2000,Tanyao Aka 2 han 30 ,Jess,
+E3.0,Ron,Thomas,Josh,2900,Tanyao Aka 2 han 30 ,Thomas,
+E3.1,Tsumo,Josh,"Thomas,Jess,Presten",8000,Menzen Tsumo Chun Sanankou 4 han 30 ,Thomas,Thomas
+E4.0,Ron,Thomas,Josh,1000,Tanyao ,Josh,Presten
+S1.0,Ryuukyoku,Thomas,"Josh,Presten,Jess",1000,Exhaustive Draw,Presten,Thomas
+S2.1,Ron,Thomas,Josh,2000,Tanyao Aka 2 han 30 ,Jess,
+S3.0,Ron,Jess,Josh,12000,Tanyao 4 Dora Aka,Thomas,Presten
+S4.0,Tsumo,Thomas,"Josh,Presten,Jess",2700,Riichi Menzen Tsumo,Josh,Thomas
+E1.0,Ron,Aaron,Thomas,3900,Sha Dora Aka 3 han 30 fu,John,John
+E2.0,Tsumo,Aaron,"Thomas,Presten,John",1500,Tanyao nomi 1 han 30 fu,Thomas,Presten
+E3.0,Tsumo,Presten,"Thomas,Aaron,John",2700,Riichi Menzen Tsumo Pinfu 3 han 20 fu,Aaron,Presten
+E4.0,Tsumo,Thomas,"Aaron,John,Presten",12000,Riichi Ippatsu Menzen Tsumo Pinfu Aka Ura 6 han 20,Presten,Thomas
+S1.0,Ron,Thomas,Josh,8000,Riichi Ippatsu iipekiou tanyao Dora 5 han 30 fu,John,Thomas
+S2.0,Ron,John,Presten,12000,Riichi Ippatsu Pinfu Tanyao Aka 2 6 han 30 fu,Thomas,John
+S3.0,Ron,Presten,John,2000,Riichi Pinfu nomi 2 han 30 fu,Aaron,Pesten
+S4.0,Tsumo,Presten,"Thomas,Aaron,John",3900,Chun Aka 2 han 40 fu,Presten,
+S4.1,Ryuukyoku,"Presten,Thomas","Aaron,John",1500,Exhasutive Draw,Presten,Thomas
+S4.2,Ron,Thomas,Aaron,5200,Riichi iipatsu ura 3 han 40,Presten,Thomas
+E1.0,Ron,Jess,Emily,1000,Tanyao Nomi 1 han 30 fu,Emily,Emily
+E2.0,Ron,Victor,Jess,12000,Riichi Ura 2 3 han 70 fu,Victor,Victor
+E2.1,Ron,Jess,Josh,6400,Riichi Chiitoi Aka 4 han 25 fu,Victor,
+E3.0,Ron,Josh,Victor,2900,Tanyao Aka 2 han 30 fu,Josh,
+E3.1,Tsumo,Emily,"Victor,Jess,Josh",5200,Riichi Menzen Tsumo Pinfu Aka,Josh,Emily
+E4.0,Tsumo,Josh,"Emily,Jess,Victor",2700,Riichi Menzen Tsumo 3 han 20 fu,Jess,Josh
+S1.0,Ron,Victor,Josh,3900,Riichi Pinfu Aka 3 han 30 fu,Emily,Victor
+S2.0,Tsumo,Emily,"Victor,Jess,Josh",8000,Haku Dora 3 Aka 4,Victor,
+S3.0,Ron,Josh,Jess,5800,Tanyao Aka 2 3 han 30 fu,Josh,
+S3.1,Ron,Emily,Josh,8000,Double Riichi Dora Ura,Josh,Emily
+S4.0,Ron,Jess,Josh,18000,Riichi Chiitoi Dora 2 Aka ,Jess,Jess
+S4.1,Ron,Victor,Jess,8000,Riichi Ippatsu Pinfu Dora 4 han 30,Jess,Victor
+E1.0,Ron,Emily,John,5200,Riichi ippatsu aka 3 han 40,Presten,Emily
+E2.0,Tsumo,Presten,"John,Victor,Emily",8000,Mangan - Riichi Haitei Menzen Tsumo Dora 2,John,Presten
+E3.0,Ron,Emily,Presten,18000,Chun Toitoi Dora 3 6 han 50 han,Emily,Presten
+E3.1,Tsumo,Emily,"John,Emily,Presten",3000,Double Ton 2 han 30 fu,Emily,
+S3.2,Ryuukyoku,"Presten,John","Victor,Emily",1500,Exhaustive Draw,Emily,Presten
+E4.3,Ron,Victor,Presten,7700,Riichi iipekiou Aka 3 han 40,Victor,Victor
+E4.4,Tsumo,Emily,"Victor,John,Presten",1100,Ton 1 han 30 fu,Victor,Victor
+S1.0,Ron,Victor,"Emily,John,Presten",8000,Riichi Ippatsu Chankan Dora 4 han 40 ,Presten,Victor
+S2.0,Ron,Emily,Presten,3900,Tanyao Aka2,John,John
+S3.0,Tsumo,Victor,"Emily,John,Presten",4000,Haku Sanshoku Doujin Dora 3 han 40,Emily,John
+S4.0,Ron,Emily,Presten,3900,Pinfu Dora Aka,Victor,
+E1.0,Ryuukyoku,John,"Emily,Presten,Victor",1000,Exhaustive Draw,Presten,Victor
+E2.1,Ron,John,Emily,2900,Sanshoku Doujin Dora 2 han 30 fu,John,
+E2.2,Ryuukyoku,,,0,Exhaustive Draw,John,
+E3.3,Ron,John,Presten,5200,Haitei Honitsu 3 han 40 fu,Emily,
+E4.0,Ron,John,Presten,2600,Riichi Ura 1 2 han 40 fu,Victor,"Victor,John"
+S1.0,Tsumo,John,"Presten,Victor,Emily",8000,Mangan Double Nan Dora 3  5 han 40 fu,Presten,
+S2.0,Ron,John,Emily,5800,Haitei Tanyao Aka 3 han 30 fu,John,
+S2.1,Ron,Presten,Emily,8000,Chun Aka 2 Dora 4 han 30 fu,John,
+S3.0,Ron,Emily,Presten,1500,Ittsu 1 han 30 fu,Emily,
+S3.1,Ryuukyoku,"John,Presten,Victor",Emily,1000,Exhaustive Draw,Emily,
+S4.2,Ron,Presten,Victor,2000,Haku Dora 2 han 30 fu,Victor,

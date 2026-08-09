@@ -119,13 +119,20 @@ deal_ins_df = (
 conn.close()
 
 # --- Display All-Time Metrics ---
-col1, col2, col3, col4 = st.columns(4)
+# --- Display All-Time Metrics ---
+col1, col2, col3, col4, col5 = st.columns(5)
+
 col1.metric("All-Time Wins", len(wins_df))
 col2.metric("All-Time Points Scored", int(wins_df["Points"].sum()))
 col3.metric("All-Time Deal-Ins", len(deal_ins_df))
 
+# Highest Value Hand
 highest_hand = wins_df["Points"].max() if not wins_df.empty else 0
 col4.metric("Highest Value Hand", int(highest_hand))
+
+# Average Winning Hand Value
+avg_hand = wins_df["Points"].mean() if not wins_df.empty else 0
+col5.metric("Avg Hand Value", f"{avg_hand:,.0f} pts")
 
 st.divider()
 

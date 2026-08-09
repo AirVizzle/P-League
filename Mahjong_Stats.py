@@ -9,25 +9,35 @@ import streamlit as st
 st.set_page_config(page_title="Mahjong League Stats", layout="wide")
 
 # 2. Google Sheets Published CSV Link
-CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=170190578&single=true&output=csv"
-
+SEASON_1_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=170190578&single=true&output=csv"
+SEASON_2_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=983730091&single=true&output=csv"
 
 
 # 3. Load & Sync Data into SQLite
 @st.cache_data(ttl=60)  # Refresh cache every 60 seconds
 def load_and_sync_data():
-    # Read live CSV from Google Sheets
-    df = pd.read_csv(CSV_URL)
-
-    # Connect to local SQLite database (creates 'mahjong_league.db' in project folder)
     conn = sqlite3.connect("mahjong_league.db")
 
-    # Push dataframe into SQLite table 'season_1_hands'
-    df.to_sql("season_1_hands", conn, if_exists="replace", index=False)
+    # --- Sync Season 1 ---
+    try:
+        df_s1 = pd.read_csv(SEASON_1_URL)
+        # Push into 'season_1_hands' table
+        df_s1.to_sql("season_1_hands", conn, if_exists="replace", index=False)
+    except Exception as e:
+        st.warning(f"Could not load Season 1 data: {e}")
+
+    # --- Sync Season 2 ---
+    try:
+        df_s2 = pd.read_csv(SEASON_2_URL)
+        # Push into 'season_2_hands' table
+        df_s2.to_sql("season_2_hands", conn, if_exists="replace", index=False)
+    except Exception as e:
+        st.warning(f"Could not load Season 2 data: {e}")
+
     conn.close()
 
-    return df
-
+    # Returns true/data indicator for Streamlit caching
+    return True
 
 # Fetch data
 try:

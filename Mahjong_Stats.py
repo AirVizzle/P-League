@@ -4,7 +4,7 @@ import plotly.express as px
 import streamlit as st
 
 # 1. Page Configuration
-st.set_page_config(page_title="Mahjong League Stats", layout="wide")
+st.set_page_config(page_title="Mahjong League - Home", layout="wide")
 
 # 2. Google Sheets Published CSV Links
 SEASON_1_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=170190578&single=true&output=csv"
@@ -34,6 +34,7 @@ def load_and_sync_data():
     # --- Sync Game Log / Schedule ---
     try:
         df_game_log = pd.read_csv(GAME_LOG_URL)
+        df_game_log.columns = df_game_log.columns.str.strip()
         df_game_log.to_sql("game_log", conn, if_exists="replace", index=False)
     except Exception as e:
         st.warning(f"Could not load Game Log data: {e}")
@@ -47,21 +48,20 @@ def load_and_sync_data():
 def get_week_ticker_text(target_week="Week 1"):
     try:
         df = pd.read_csv(GAME_LOG_URL)
+        df.columns = df.columns.str.strip()
         ticker_items = []
 
-        # Filter for the target week if 'Week' column exists
         week_games = (
             df[df["Week"] == target_week] if "Week" in df.columns else df
         )
 
         for _, row in week_games.iterrows():
-            group = row.get("Group", "Match") if "Group" in df.columns else "Match"
+            group = (
+                row.get("Group", "Match") if "Group" in df.columns else "Match"
+            )
+            score_1 = str(row.get("Score 1", "")).strip()
 
-            # Check if game has scores logged
-            if (
-                pd.notna(row.get("Score 1"))
-                and str(row.get("Score 1")).strip() != ""
-            ):
+            if pd.notna(row.get("Score 1")) and score_1 not in ["", "nan"]:
                 p1, s1 = row.get("Player 1", ""), row.get("Score 1", 0)
                 p2, s2 = row.get("Player 2", ""), row.get("Score 2", 0)
                 p3, s3 = row.get("Player 3", ""), row.get("Score 3", 0)
@@ -69,11 +69,13 @@ def get_week_ticker_text(target_week="Week 1"):
 
                 match_str = f"🏆 [{target_week} - {group} Result]: {p1} ({s1}) | {p2} ({s2}) | {p3} ({s3}) | {p4} ({s4})"
             else:
-                players = [
-                    str(row.get(f"Player {i}"))
-                    for i in range(1, 5)
-                    if pd.notna(row.get(f"Player {i}"))
-                ]
+                players = []
+                for i in [1, 2, 3, 4]:
+                    col_name = f"Player {i}"
+                    val = row.get(col_name)
+                    if pd.notna(val) and str(val).strip() not in ["", "nan"]:
+                        players.append(str(val).strip())
+
                 player_list_str = (
                     ", ".join(players) if players else "Players TBD"
                 )
@@ -89,12 +91,11 @@ def get_week_ticker_text(target_week="Week 1"):
         )
 
     except Exception:
-        return "🀄 Welcome to P League! Check match details in the schedule tab."
+        return f"🀄 Welcome to P League! Check match details in the schedule tab."
 
 
 # --- App Execution ---
 try:
-    # Trigger database sync
     load_and_sync_data()
 
     # 5. Display Rolling Match Ticker
@@ -138,36 +139,131 @@ try:
     # Title
     st.title("🀄 Mahjong League Dashboard")
 
-    # Connect to SQLite to read tables for UI display
     conn = sqlite3.connect("mahjong_league.db")
-    df_s2 = pd.read_sql_query("SELECT * FROM season_2_hands", conn)
-    df_log = pd.read_sql_query("SELECT * FROM game_log", conn)
+
+
+        # Fetch Season 2 Standings (Includes ALL scheduled players at 0 pts before games start)
+    leaderboard_query = """
+        WITH AllPlayers AS (
+            SELECT DISTINCT `Player 1` AS Player FROM game_log WHERE `Player 1` IS NOT NULL AND `Player 1` != ''
+            UNION
+            SELECT DISTINCT `Player 2` AS Player FROM game_log WHERE `Player 2` IS NOT NULL AND `Player 2` != ''
+            UNION
+            SELECT DISTINCT `Player 3` AS Player FROM game_log WHERE `Player 3` IS NOT NULL AND `Player 3` != ''
+            UNION
+            SELECT DISTINCT `Player 4` AS Player FROM game_log WHERE `Player 4` IS NOT NULL AND `Player 4` != ''
+        )
+        SELECT 
+            p.Player,
+            COALESCE(COUNT(h.Winner), 0) AS Single_Wins,
+            COALESCE(SUM(h.Points), 0) AS Total_Points
+        FROM AllPlayers p
+        LEFT JOIN season_2_hands h 
+               ON p.Player = h.Winner 
+              AND h.Action IN ('Ron', 'Tsumo') 
+              AND h.Winner NOT LIKE '%,%'
+        GROUP BY p.Player
+        ORDER BY Total_Points DESC, p.Player ASC;
+    """
+    
+
+    try:
+        s2_leaderboard = pd.read_sql_query(leaderboard_query, conn)
+    except Exception:
+        s2_leaderboard = pd.DataFrame()
+
+    try:
+        df_s2_hands = pd.read_sql_query("SELECT * FROM season_2_hands", conn)
+    except Exception:
+        df_s2_hands = pd.DataFrame()
+
+    try:
+        df_log = pd.read_sql_query("SELECT * FROM game_log", conn)
+    except Exception:
+        df_log = pd.DataFrame()
+
     conn.close()
 
-    # 6. Main Dashboard Tabs
-    tab_overview, tab_schedule = st.tabs(["📊 Season 2 Hands", "📅 Match Log"])
+    # --- Live Metric Cards ---
+    col1, col2, col3 = st.columns(3)
+    total_hands_count = len(df_s2_hands) if not df_s2_hands.empty else 0
+    leader_name = (
+        s2_leaderboard.iloc[0]["Player"] if not s2_leaderboard.empty else "N/A"
+    )
+    top_score_val = (
+        s2_leaderboard.iloc[0]["Total_Points"]
+        if not s2_leaderboard.empty
+        else 0
+    )
 
-    with tab_overview:
+    col1.metric("Season 2 Total Hands", total_hands_count)
+    col2.metric("Current Leader", leader_name)
+    col3.metric("Top Score", top_score_val)
+
+    st.divider()
+
+    # --- Main Dashboard Tabs ---
+    tab_standings, tab_hands, tab_schedule = st.tabs(
+        ["🏆 Live Standings", "📊 Season 2 Hands", "📅 Match Log"]
+    )
+
+    with tab_standings:
+        left_col, right_col = st.columns([1, 1])
+
+        with left_col:
+            st.subheader("🏆 Season 2 Standings")
+            if not s2_leaderboard.empty:
+                st.dataframe(
+                    s2_leaderboard, use_container_width=True, hide_index=True
+                )
+            else:
+                st.info(
+                    "Season 2 games haven't been logged yet or database is syncing!"
+                )
+
+        with right_col:
+            st.subheader("📊 Points Breakdown")
+            if not s2_leaderboard.empty:
+                fig = px.bar(
+                    s2_leaderboard,
+                    x="Player",
+                    y="Total_Points",
+                    color="Player",
+                    title="Points Scored",
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Standings chart will appear as games are logged.")
+
+    with tab_hands:
         st.subheader("Recent Season 2 Hands")
-        st.dataframe(df_s2.head(10), use_container_width=True)
+        if not df_s2_hands.empty:
+            st.dataframe(df_s2_hands.head(10), use_container_width=True)
 
-        if "Action" in df_s2.columns:
-            st.subheader("Hand Outcomes Overview")
-            action_counts = df_s2["Action"].value_counts().reset_index()
-            action_counts.columns = ["Action", "Count"]
+            if "Action" in df_s2_hands.columns:
+                st.subheader("Hand Outcomes Overview")
+                action_counts = (
+                    df_s2_hands["Action"].value_counts().reset_index()
+                )
+                action_counts.columns = ["Action", "Count"]
 
-            fig = px.bar(
-                action_counts,
-                x="Action",
-                y="Count",
-                color="Action",
-                title="Total Actions Played (Season 2)",
-            )
-            st.plotly_chart(fig, use_container_width=True)
+                fig_actions = px.bar(
+                    action_counts,
+                    x="Action",
+                    y="Count",
+                    color="Action",
+                    title="Total Actions Played (Season 2)",
+                )
+                st.plotly_chart(fig_actions, use_container_width=True)
+        else:
+            st.info("No Season 2 hand data found.")
 
     with tab_schedule:
         st.subheader("Match Log & Upcoming Tables")
-        st.dataframe(df_log, use_container_width=True)
+        if not df_log.empty:
+            st.dataframe(df_log, use_container_width=True, hide_index=True)
+        else:
+            st.info("No match log data found.")
 
 except Exception as e:
     st.error(f"Could not load data. Check your published URLs or database: {e}")

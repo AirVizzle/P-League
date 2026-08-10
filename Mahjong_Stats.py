@@ -11,27 +11,27 @@ SEASON_1_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzB
 SEASON_2_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=983730091&single=true&output=csv"
 GAME_LOG_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=721192921&single=true&output=csv"
 
+# Conference Rosters
+EAST_PLAYERS = ["Victor", "John", "Emily", "Presten", "Thomas", "Eli"]
+SOUTH_PLAYERS = ["Tyler", "Jess", "Aaron", "Phonzo", "George", "Josh"]
+ALL_PLAYERS = EAST_PLAYERS + SOUTH_PLAYERS
+
 
 # 3. Load & Sync Data into SQLite
-@st.cache_data(ttl=60)  # Refresh cache every 60 seconds
+@st.cache_data(ttl=60)
 def load_and_sync_data():
     conn = sqlite3.connect("mahjong_league.db")
 
-    # --- Sync Season 1 ---
     try:
-        df_s1 = pd.read_csv(SEASON_1_URL)
-        df_s1.to_sql("season_1_hands", conn, if_exists="replace", index=False)
+        pd.read_csv(SEASON_1_URL).to_sql("season_1_hands", conn, if_exists="replace", index=False)
     except Exception as e:
         st.warning(f"Could not load Season 1 data: {e}")
 
-    # --- Sync Season 2 ---
     try:
-        df_s2 = pd.read_csv(SEASON_2_URL)
-        df_s2.to_sql("season_2_hands", conn, if_exists="replace", index=False)
+        pd.read_csv(SEASON_2_URL).to_sql("season_2_hands", conn, if_exists="replace", index=False)
     except Exception as e:
         st.warning(f"Could not load Season 2 data: {e}")
 
-    # --- Sync Game Log / Schedule ---
     try:
         df_game_log = pd.read_csv(GAME_LOG_URL)
         df_game_log.columns = df_game_log.columns.str.strip()
@@ -43,7 +43,56 @@ def load_and_sync_data():
     return True
 
 
-# 4. Helper Function: Generate Dynamic Weekly Ticker
+# 4. Helper Function: Calculate Standings & Placements from Game Log
+def calculate_standings_from_game_log(df_log):
+    # Initialize baseline dictionary for all 12 players
+    stats = {
+        p: {"Games": 0, "1st": 0, "2nd": 0, "3rd": 0, "4th": 0, "Points": 0.0}
+        for p in ALL_PLAYERS
+    }
+
+    if not df_log.empty and "Score 1" in df_log.columns:
+        # Loop through games that have scores recorded
+        for _, row in df_log.iterrows():
+            score_1 = str(row.get("Score 1", "")).strip()
+            if pd.notna(row.get("Score 1")) and score_1 not in ["", "nan"]:
+                game_players = []
+                for i in range(1, 5):
+                    p = str(row.get(f"Player {i}", "")).strip()
+                    try:
+                        s = float(row.get(f"Score {i}", 0))
+                    except ValueError:
+                        s = 0.0
+                    if p and p in stats:
+                        game_players.append((p, s))
+
+                if game_players:
+                    # Sort players by game score descending to determine rank
+                    game_players.sort(key=lambda x: x[1], reverse=True)
+                    placements = ["1st", "2nd", "3rd", "4th"]
+
+                    for rank_idx, (p_name, score) in enumerate(game_players):
+                        stats[p_name]["Games"] += 1
+                        stats[p_name]["Points"] += score
+                        if rank_idx < 4:
+                            stats[p_name][placements[rank_idx]] += 1
+
+    # Convert to DataFrame
+    df = pd.DataFrame.from_dict(stats, orient="index").reset_index()
+    df.rename(columns={"index": "Player"}, inplace=True)
+
+    # Assign Conference
+    df["Conference"] = df["Player"].apply(
+        lambda x: "East" if x in EAST_PLAYERS else ("South" if x in SOUTH_PLAYERS else "Other")
+    )
+
+    # Sort by Points descending, then 1st place finishes
+    df.sort_values(by=["Points", "1st", "2nd"], ascending=False, inplace=True)
+    df.reset_index(drop=True, inplace=True)
+    return df
+
+
+# 5. Helper Function: Generate Dynamic Weekly Ticker
 @st.cache_data(ttl=60)
 def get_week_ticker_text(target_week="Week 1"):
     try:
@@ -51,14 +100,10 @@ def get_week_ticker_text(target_week="Week 1"):
         df.columns = df.columns.str.strip()
         ticker_items = []
 
-        week_games = (
-            df[df["Week"] == target_week] if "Week" in df.columns else df
-        )
+        week_games = df[df["Week"] == target_week] if "Week" in df.columns else df
 
         for _, row in week_games.iterrows():
-            group = (
-                row.get("Group", "Match") if "Group" in df.columns else "Match"
-            )
+            group = row.get("Group", "Match") if "Group" in df.columns else "Match"
             score_1 = str(row.get("Score 1", "")).strip()
 
             if pd.notna(row.get("Score 1")) and score_1 not in ["", "nan"]:
@@ -69,16 +114,12 @@ def get_week_ticker_text(target_week="Week 1"):
 
                 match_str = f"🏆 [{target_week} - {group} Result]: {p1} ({s1}) | {p2} ({s2}) | {p3} ({s3}) | {p4} ({s4})"
             else:
-                players = []
-                for i in [1, 2, 3, 4]:
-                    col_name = f"Player {i}"
-                    val = row.get(col_name)
-                    if pd.notna(val) and str(val).strip() not in ["", "nan"]:
-                        players.append(str(val).strip())
-
-                player_list_str = (
-                    ", ".join(players) if players else "Players TBD"
-                )
+                players = [
+                    str(row.get(f"Player {i}")).strip()
+                    for i in range(1, 5)
+                    if pd.notna(row.get(f"Player {i}")) and str(row.get(f"Player {i}")).strip() not in ["", "nan"]
+                ]
+                player_list_str = ", ".join(players) if players else "Players TBD"
                 match_str = f"⏳ [{target_week} - {group}]: {player_list_str} ➔ Status: TBA"
 
             ticker_items.append(match_str)
@@ -86,19 +127,17 @@ def get_week_ticker_text(target_week="Week 1"):
         if not ticker_items:
             return f"🀄 {target_week} Schedule: No matches posted yet."
 
-        return " &nbsp;&nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp;&nbsp; ".join(
-            ticker_items
-        )
+        return " &nbsp;&nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp;&nbsp; ".join(ticker_items)
 
     except Exception:
-        return f"🀄 Welcome to P League! Check match details in the schedule tab."
+        return "🀄 Welcome to P League! Check match details in the schedule tab."
 
 
 # --- App Execution ---
 try:
     load_and_sync_data()
 
-    # 5. Display Rolling Match Ticker
+    # Ticker HTML
     ticker_text = get_week_ticker_text(target_week="Week 1")
     ticker_html = f"""
     <style>
@@ -136,43 +175,9 @@ try:
     """
     st.markdown(ticker_html, unsafe_allow_html=True)
 
-    # Title
     st.title("🀄 Mahjong League Dashboard")
 
     conn = sqlite3.connect("mahjong_league.db")
-
-    # 1. Official Conference Rosters
-    EAST_PLAYERS = ["Victor", "John", "Emily", "Presten", "Thomas", "Eli"]
-    SOUTH_PLAYERS = ["Tyler", "Jess", "Aaron", "Phonzo", "George", "Josh"]
-
-    # 2. Fetch Season 2 Standings
-    leaderboard_query = """
-        WITH AllPlayers AS (
-            SELECT DISTINCT `Player 1` AS Player FROM game_log WHERE `Player 1` IS NOT NULL AND `Player 1` != ''
-            UNION
-            SELECT DISTINCT `Player 2` AS Player FROM game_log WHERE `Player 2` IS NOT NULL AND `Player 2` != ''
-            UNION
-            SELECT DISTINCT `Player 3` AS Player FROM game_log WHERE `Player 3` IS NOT NULL AND `Player 3` != ''
-            UNION
-            SELECT DISTINCT `Player 4` AS Player FROM game_log WHERE `Player 4` IS NOT NULL AND `Player 4` != ''
-        )
-        SELECT 
-            p.Player,
-            COALESCE(COUNT(h.Winner), 0) AS Single_Wins,
-            COALESCE(SUM(h.Points), 0) AS Total_Points
-        FROM AllPlayers p
-        LEFT JOIN season_2_hands h 
-               ON p.Player = h.Winner 
-              AND h.Action IN ('Ron', 'Tsumo') 
-              AND h.Winner NOT LIKE '%,%'
-        GROUP BY p.Player
-        ORDER BY Total_Points DESC, p.Player ASC;
-    """
-
-    try:
-        s2_leaderboard = pd.read_sql_query(leaderboard_query, conn)
-    except Exception:
-        s2_leaderboard = pd.DataFrame()
 
     try:
         df_s2_hands = pd.read_sql_query("SELECT * FROM season_2_hands", conn)
@@ -186,54 +191,31 @@ try:
 
     conn.close()
 
-    # 3. Dynamic Conference Assignment & Pre-populated Fallback
-    if not s2_leaderboard.empty:
+    # Calculate Full Standings from Game Log
+    s2_leaderboard = calculate_standings_from_game_log(df_log)
 
-        def assign_conf(player_name):
-            if player_name in EAST_PLAYERS:
-                return "East"
-            elif player_name in SOUTH_PLAYERS:
-                return "South"
-            return "Other"
-
-        s2_leaderboard["Conference"] = s2_leaderboard["Player"].apply(
-            assign_conf
-        )
-
-        east_df = (
-            s2_leaderboard[s2_leaderboard["Conference"] == "East"]
-            .drop(columns=["Conference"])
-            .reset_index(drop=True)
-        )
-        south_df = (
-            s2_leaderboard[s2_leaderboard["Conference"] == "South"]
-            .drop(columns=["Conference"])
-            .reset_index(drop=True)
-        )
-    else:
-        # Baseline tables if data is syncing
-        east_df = pd.DataFrame(
-            {"Player": EAST_PLAYERS, "Single_Wins": 0, "Total_Points": 0}
-        )
-        south_df = pd.DataFrame(
-            {"Player": SOUTH_PLAYERS, "Single_Wins": 0, "Total_Points": 0}
-        )
+    # Filter into East and South Conferences
+    east_df = (
+        s2_leaderboard[s2_leaderboard["Conference"] == "East"]
+        .drop(columns=["Conference"])
+        .reset_index(drop=True)
+    )
+    south_df = (
+        s2_leaderboard[s2_leaderboard["Conference"] == "South"]
+        .drop(columns=["Conference"])
+        .reset_index(drop=True)
+    )
+    overall_df = s2_leaderboard.drop(columns=["Conference"]).reset_index(drop=True)
 
     # --- Live Metric Cards ---
     col1, col2, col3 = st.columns(3)
     total_hands_count = len(df_s2_hands) if not df_s2_hands.empty else 0
-    leader_name = (
-        s2_leaderboard.iloc[0]["Player"] if not s2_leaderboard.empty else "N/A"
-    )
-    top_score_val = (
-        s2_leaderboard.iloc[0]["Total_Points"]
-        if not s2_leaderboard.empty
-        else 0
-    )
+    leader_name = overall_df.iloc[0]["Player"] if not overall_df.empty else "N/A"
+    top_score_val = overall_df.iloc[0]["Points"] if not overall_df.empty else 0.0
 
     col1.metric("Season 2 Total Hands", total_hands_count)
     col2.metric("Current Leader", leader_name)
-    col3.metric("Top Score", top_score_val)
+    col3.metric("Top Score", f"{top_score_val:+.1f}")
 
     st.divider()
 
@@ -243,12 +225,11 @@ try:
     )
 
     with tab_standings:
-        left_col, right_col = st.columns([1.2, 0.8])
+        left_col, right_col = st.columns([1.3, 0.7])
 
         with left_col:
             st.subheader("🏆 Season 2 Standings")
 
-            # Sub-Tabs for Conferences
             tab_overall, tab_east, tab_south = st.tabs(
                 [
                     "🌐 Overall League",
@@ -258,43 +239,24 @@ try:
             )
 
             with tab_overall:
-                if not s2_leaderboard.empty:
-                    display_overall = s2_leaderboard.drop(
-                        columns=["Conference"], errors="ignore"
-                    )
-                    st.dataframe(
-                        display_overall,
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-                else:
-                    st.info(
-                        "Season 2 games haven't been logged yet or database is syncing!"
-                    )
+                st.dataframe(overall_df, use_container_width=True, hide_index=True)
 
             with tab_east:
-                st.dataframe(
-                    east_df, use_container_width=True, hide_index=True
-                )
+                st.dataframe(east_df, use_container_width=True, hide_index=True)
 
             with tab_south:
-                st.dataframe(
-                    south_df, use_container_width=True, hide_index=True
-                )
+                st.dataframe(south_df, use_container_width=True, hide_index=True)
 
         with right_col:
             st.subheader("📊 Points Breakdown")
-            if not s2_leaderboard.empty:
-                fig = px.bar(
-                    s2_leaderboard,
-                    x="Player",
-                    y="Total_Points",
-                    color="Player",
-                    title="Points Scored",
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Standings chart will appear as games are logged.")
+            fig = px.bar(
+                overall_df,
+                x="Player",
+                y="Points",
+                color="Player",
+                title="Total League Points",
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
     with tab_hands:
         st.subheader("Recent Season 2 Hands")
@@ -303,9 +265,7 @@ try:
 
             if "Action" in df_s2_hands.columns:
                 st.subheader("Hand Outcomes Overview")
-                action_counts = (
-                    df_s2_hands["Action"].value_counts().reset_index()
-                )
+                action_counts = df_s2_hands["Action"].value_counts().reset_index()
                 action_counts.columns = ["Action", "Count"]
 
                 fig_actions = px.bar(

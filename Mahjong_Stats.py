@@ -141,20 +141,20 @@ try:
 
     conn = sqlite3.connect("mahjong_league.db")
 
-
-        # Fetch Season 2 Standings (Includes ALL scheduled players at 0 pts before games start)
+    # Fetch Season 2 Standings with Conference/Group mapping
     leaderboard_query = """
         WITH AllPlayers AS (
-            SELECT DISTINCT `Player 1` AS Player FROM game_log WHERE `Player 1` IS NOT NULL AND `Player 1` != ''
+            SELECT DISTINCT `Player 1` AS Player, `Group` AS Conference FROM game_log WHERE `Player 1` IS NOT NULL AND `Player 1` != ''
             UNION
-            SELECT DISTINCT `Player 2` AS Player FROM game_log WHERE `Player 2` IS NOT NULL AND `Player 2` != ''
+            SELECT DISTINCT `Player 2` AS Player, `Group` AS Conference FROM game_log WHERE `Player 2` IS NOT NULL AND `Player 2` != ''
             UNION
-            SELECT DISTINCT `Player 3` AS Player FROM game_log WHERE `Player 3` IS NOT NULL AND `Player 3` != ''
+            SELECT DISTINCT `Player 3` AS Player, `Group` AS Conference FROM game_log WHERE `Player 3` IS NOT NULL AND `Player 3` != ''
             UNION
-            SELECT DISTINCT `Player 4` AS Player FROM game_log WHERE `Player 4` IS NOT NULL AND `Player 4` != ''
+            SELECT DISTINCT `Player 4` AS Player, `Group` AS Conference FROM game_log WHERE `Player 4` IS NOT NULL AND `Player 4` != ''
         )
         SELECT 
             p.Player,
+            p.Conference,
             COALESCE(COUNT(h.Winner), 0) AS Single_Wins,
             COALESCE(SUM(h.Points), 0) AS Total_Points
         FROM AllPlayers p
@@ -162,10 +162,9 @@ try:
                ON p.Player = h.Winner 
               AND h.Action IN ('Ron', 'Tsumo') 
               AND h.Winner NOT LIKE '%,%'
-        GROUP BY p.Player
+        GROUP BY p.Player, p.Conference
         ORDER BY Total_Points DESC, p.Player ASC;
     """
-    
 
     try:
         s2_leaderboard = pd.read_sql_query(leaderboard_query, conn)
@@ -183,6 +182,30 @@ try:
         df_log = pd.DataFrame()
 
     conn.close()
+
+    # Filter for East and South Conferences
+    if not s2_leaderboard.empty and "Conference" in s2_leaderboard.columns:
+        east_df = (
+            s2_leaderboard[
+                s2_leaderboard["Conference"]
+                .astype(str)
+                .str.contains("East", case=False, na=False)
+            ]
+            .drop(columns=["Conference"])
+            .reset_index(drop=True)
+        )
+        south_df = (
+            s2_leaderboard[
+                s2_leaderboard["Conference"]
+                .astype(str)
+                .str.contains("South", case=False, na=False)
+            ]
+            .drop(columns=["Conference"])
+            .reset_index(drop=True)
+        )
+    else:
+        east_df = pd.DataFrame()
+        south_df = pd.DataFrame()
 
     # --- Live Metric Cards ---
     col1, col2, col3 = st.columns(3)
@@ -208,18 +231,47 @@ try:
     )
 
     with tab_standings:
-        left_col, right_col = st.columns([1, 1])
+        left_col, right_col = st.columns([1.2, 0.8])
 
         with left_col:
             st.subheader("🏆 Season 2 Standings")
-            if not s2_leaderboard.empty:
-                st.dataframe(
-                    s2_leaderboard, use_container_width=True, hide_index=True
-                )
-            else:
-                st.info(
-                    "Season 2 games haven't been logged yet or database is syncing!"
-                )
+
+            # Option 2: Conference Tabs inside Standings
+            tab_overall, tab_east, tab_south = st.tabs(
+                [
+                    "🌐 Overall League",
+                    "🀀 East Conference",
+                    "🀁 South Conference",
+                ]
+            )
+
+            with tab_overall:
+                if not s2_leaderboard.empty:
+                    st.dataframe(
+                        s2_leaderboard,
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                else:
+                    st.info(
+                        "Season 2 games haven't been logged yet or database is syncing!"
+                    )
+
+            with tab_east:
+                if not east_df.empty:
+                    st.dataframe(
+                        east_df, use_container_width=True, hide_index=True
+                    )
+                else:
+                    st.info("No players assigned to East Conference or no data yet.")
+
+            with tab_south:
+                if not south_df.empty:
+                    st.dataframe(
+                        south_df, use_container_width=True, hide_index=True
+                    )
+                else:
+                    st.info("No players assigned to South Conference or no data yet.")
 
         with right_col:
             st.subheader("📊 Points Breakdown")

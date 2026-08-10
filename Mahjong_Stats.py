@@ -141,20 +141,23 @@ try:
 
     conn = sqlite3.connect("mahjong_league.db")
 
-    # Fetch Season 2 Standings with Conference/Group mapping
+    # 1. Official Conference Rosters
+    EAST_PLAYERS = ["Victor", "John", "Emily", "Presten", "Thomas", "Eli"]
+    SOUTH_PLAYERS = ["Tyler", "Jess", "Aaron", "Phonzo", "George", "Josh"]
+
+    # 2. Fetch Season 2 Standings
     leaderboard_query = """
         WITH AllPlayers AS (
-            SELECT DISTINCT `Player 1` AS Player, `Group` AS Conference FROM game_log WHERE `Player 1` IS NOT NULL AND `Player 1` != ''
+            SELECT DISTINCT `Player 1` AS Player FROM game_log WHERE `Player 1` IS NOT NULL AND `Player 1` != ''
             UNION
-            SELECT DISTINCT `Player 2` AS Player, `Group` AS Conference FROM game_log WHERE `Player 2` IS NOT NULL AND `Player 2` != ''
+            SELECT DISTINCT `Player 2` AS Player FROM game_log WHERE `Player 2` IS NOT NULL AND `Player 2` != ''
             UNION
-            SELECT DISTINCT `Player 3` AS Player, `Group` AS Conference FROM game_log WHERE `Player 3` IS NOT NULL AND `Player 3` != ''
+            SELECT DISTINCT `Player 3` AS Player FROM game_log WHERE `Player 3` IS NOT NULL AND `Player 3` != ''
             UNION
-            SELECT DISTINCT `Player 4` AS Player, `Group` AS Conference FROM game_log WHERE `Player 4` IS NOT NULL AND `Player 4` != ''
+            SELECT DISTINCT `Player 4` AS Player FROM game_log WHERE `Player 4` IS NOT NULL AND `Player 4` != ''
         )
         SELECT 
             p.Player,
-            p.Conference,
             COALESCE(COUNT(h.Winner), 0) AS Single_Wins,
             COALESCE(SUM(h.Points), 0) AS Total_Points
         FROM AllPlayers p
@@ -162,7 +165,7 @@ try:
                ON p.Player = h.Winner 
               AND h.Action IN ('Ron', 'Tsumo') 
               AND h.Winner NOT LIKE '%,%'
-        GROUP BY p.Player, p.Conference
+        GROUP BY p.Player
         ORDER BY Total_Points DESC, p.Player ASC;
     """
 
@@ -183,29 +186,38 @@ try:
 
     conn.close()
 
-    # Filter for East and South Conferences
-    if not s2_leaderboard.empty and "Conference" in s2_leaderboard.columns:
+    # 3. Dynamic Conference Assignment & Pre-populated Fallback
+    if not s2_leaderboard.empty:
+
+        def assign_conf(player_name):
+            if player_name in EAST_PLAYERS:
+                return "East"
+            elif player_name in SOUTH_PLAYERS:
+                return "South"
+            return "Other"
+
+        s2_leaderboard["Conference"] = s2_leaderboard["Player"].apply(
+            assign_conf
+        )
+
         east_df = (
-            s2_leaderboard[
-                s2_leaderboard["Conference"]
-                .astype(str)
-                .str.contains("East", case=False, na=False)
-            ]
+            s2_leaderboard[s2_leaderboard["Conference"] == "East"]
             .drop(columns=["Conference"])
             .reset_index(drop=True)
         )
         south_df = (
-            s2_leaderboard[
-                s2_leaderboard["Conference"]
-                .astype(str)
-                .str.contains("South", case=False, na=False)
-            ]
+            s2_leaderboard[s2_leaderboard["Conference"] == "South"]
             .drop(columns=["Conference"])
             .reset_index(drop=True)
         )
     else:
-        east_df = pd.DataFrame()
-        south_df = pd.DataFrame()
+        # Baseline tables if data is syncing
+        east_df = pd.DataFrame(
+            {"Player": EAST_PLAYERS, "Single_Wins": 0, "Total_Points": 0}
+        )
+        south_df = pd.DataFrame(
+            {"Player": SOUTH_PLAYERS, "Single_Wins": 0, "Total_Points": 0}
+        )
 
     # --- Live Metric Cards ---
     col1, col2, col3 = st.columns(3)
@@ -236,7 +248,7 @@ try:
         with left_col:
             st.subheader("🏆 Season 2 Standings")
 
-            # Option 2: Conference Tabs inside Standings
+            # Sub-Tabs for Conferences
             tab_overall, tab_east, tab_south = st.tabs(
                 [
                     "🌐 Overall League",
@@ -247,8 +259,11 @@ try:
 
             with tab_overall:
                 if not s2_leaderboard.empty:
+                    display_overall = s2_leaderboard.drop(
+                        columns=["Conference"], errors="ignore"
+                    )
                     st.dataframe(
-                        s2_leaderboard,
+                        display_overall,
                         use_container_width=True,
                         hide_index=True,
                     )
@@ -258,20 +273,14 @@ try:
                     )
 
             with tab_east:
-                if not east_df.empty:
-                    st.dataframe(
-                        east_df, use_container_width=True, hide_index=True
-                    )
-                else:
-                    st.info("No players assigned to East Conference or no data yet.")
+                st.dataframe(
+                    east_df, use_container_width=True, hide_index=True
+                )
 
             with tab_south:
-                if not south_df.empty:
-                    st.dataframe(
-                        south_df, use_container_width=True, hide_index=True
-                    )
-                else:
-                    st.info("No players assigned to South Conference or no data yet.")
+                st.dataframe(
+                    south_df, use_container_width=True, hide_index=True
+                )
 
         with right_col:
             st.subheader("📊 Points Breakdown")

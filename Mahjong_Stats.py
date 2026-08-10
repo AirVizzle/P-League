@@ -23,12 +23,16 @@ def load_and_sync_data():
     conn = sqlite3.connect("mahjong_league.db")
 
     try:
-        pd.read_csv(SEASON_1_URL).to_sql("season_1_hands", conn, if_exists="replace", index=False)
+        pd.read_csv(SEASON_1_URL).to_sql(
+            "season_1_hands", conn, if_exists="replace", index=False
+        )
     except Exception as e:
         st.warning(f"Could not load Season 1 data: {e}")
 
     try:
-        pd.read_csv(SEASON_2_URL).to_sql("season_2_hands", conn, if_exists="replace", index=False)
+        pd.read_csv(SEASON_2_URL).to_sql(
+            "season_2_hands", conn, if_exists="replace", index=False
+        )
     except Exception as e:
         st.warning(f"Could not load Season 2 data: {e}")
 
@@ -43,11 +47,18 @@ def load_and_sync_data():
     return True
 
 
-# 4. Helper Function: Calculate Standings & Placements from Game Log
+# 4. Helper Function: Calculate Standings & Placements from Game Log (using net Uma)
 def calculate_standings_from_game_log(df_log):
     # Initialize baseline dictionary for all 12 players
     stats = {
-        p: {"Games": 0, "1st": 0, "2nd": 0, "3rd": 0, "4th": 0, "Points": 0.0}
+        p: {
+            "Games": 0,
+            "1st": 0,
+            "2nd": 0,
+            "3rd": 0,
+            "4th": 0,
+            "Uma / Points": 0.0,
+        }
         for p in ALL_PLAYERS
     }
 
@@ -73,7 +84,9 @@ def calculate_standings_from_game_log(df_log):
 
                     for rank_idx, (p_name, score) in enumerate(game_players):
                         stats[p_name]["Games"] += 1
-                        stats[p_name]["Points"] += score
+                        stats[p_name][
+                            "Uma / Points"
+                        ] += score  # Sums final net Uma points
                         if rank_idx < 4:
                             stats[p_name][placements[rank_idx]] += 1
 
@@ -83,11 +96,15 @@ def calculate_standings_from_game_log(df_log):
 
     # Assign Conference
     df["Conference"] = df["Player"].apply(
-        lambda x: "East" if x in EAST_PLAYERS else ("South" if x in SOUTH_PLAYERS else "Other")
+        lambda x: "East"
+        if x in EAST_PLAYERS
+        else ("South" if x in SOUTH_PLAYERS else "Other")
     )
 
-    # Sort by Points descending, then 1st place finishes
-    df.sort_values(by=["Points", "1st", "2nd"], ascending=False, inplace=True)
+    # Sort by Net Uma Points descending, then 1st place finishes
+    df.sort_values(
+        by=["Uma / Points", "1st", "2nd"], ascending=False, inplace=True
+    )
     df.reset_index(drop=True, inplace=True)
     return df
 
@@ -100,10 +117,14 @@ def get_week_ticker_text(target_week="Week 1"):
         df.columns = df.columns.str.strip()
         ticker_items = []
 
-        week_games = df[df["Week"] == target_week] if "Week" in df.columns else df
+        week_games = (
+            df[df["Week"] == target_week] if "Week" in df.columns else df
+        )
 
         for _, row in week_games.iterrows():
-            group = row.get("Group", "Match") if "Group" in df.columns else "Match"
+            group = (
+                row.get("Group", "Match") if "Group" in df.columns else "Match"
+            )
             score_1 = str(row.get("Score 1", "")).strip()
 
             if pd.notna(row.get("Score 1")) and score_1 not in ["", "nan"]:
@@ -117,9 +138,12 @@ def get_week_ticker_text(target_week="Week 1"):
                 players = [
                     str(row.get(f"Player {i}")).strip()
                     for i in range(1, 5)
-                    if pd.notna(row.get(f"Player {i}")) and str(row.get(f"Player {i}")).strip() not in ["", "nan"]
+                    if pd.notna(row.get(f"Player {i}"))
+                    and str(row.get(f"Player {i}")).strip() not in ["", "nan"]
                 ]
-                player_list_str = ", ".join(players) if players else "Players TBD"
+                player_list_str = (
+                    ", ".join(players) if players else "Players TBD"
+                )
                 match_str = f"⏳ [{target_week} - {group}]: {player_list_str} ➔ Status: TBA"
 
             ticker_items.append(match_str)
@@ -127,7 +151,9 @@ def get_week_ticker_text(target_week="Week 1"):
         if not ticker_items:
             return f"🀄 {target_week} Schedule: No matches posted yet."
 
-        return " &nbsp;&nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp;&nbsp; ".join(ticker_items)
+        return " &nbsp;&nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp;&nbsp; ".join(
+            ticker_items
+        )
 
     except Exception:
         return "🀄 Welcome to P League! Check match details in the schedule tab."
@@ -205,13 +231,19 @@ try:
         .drop(columns=["Conference"])
         .reset_index(drop=True)
     )
-    overall_df = s2_leaderboard.drop(columns=["Conference"]).reset_index(drop=True)
+    overall_df = s2_leaderboard.drop(columns=["Conference"]).reset_index(
+        drop=True
+    )
 
     # --- Live Metric Cards ---
     col1, col2, col3 = st.columns(3)
     total_hands_count = len(df_s2_hands) if not df_s2_hands.empty else 0
-    leader_name = overall_df.iloc[0]["Player"] if not overall_df.empty else "N/A"
-    top_score_val = overall_df.iloc[0]["Points"] if not overall_df.empty else 0.0
+    leader_name = (
+        overall_df.iloc[0]["Player"] if not overall_df.empty else "N/A"
+    )
+    top_score_val = (
+        overall_df.iloc[0]["Uma / Points"] if not overall_df.empty else 0.0
+    )
 
     col1.metric("Season 2 Total Hands", total_hands_count)
     col2.metric("Current Leader", leader_name)
@@ -239,22 +271,28 @@ try:
             )
 
             with tab_overall:
-                st.dataframe(overall_df, use_container_width=True, hide_index=True)
+                st.dataframe(
+                    overall_df, use_container_width=True, hide_index=True
+                )
 
             with tab_east:
-                st.dataframe(east_df, use_container_width=True, hide_index=True)
+                st.dataframe(
+                    east_df, use_container_width=True, hide_index=True
+                )
 
             with tab_south:
-                st.dataframe(south_df, use_container_width=True, hide_index=True)
+                st.dataframe(
+                    south_df, use_container_width=True, hide_index=True
+                )
 
         with right_col:
             st.subheader("📊 Points Breakdown")
             fig = px.bar(
                 overall_df,
                 x="Player",
-                y="Points",
+                y="Uma / Points",
                 color="Player",
-                title="Total League Points",
+                title="Total League Net Uma",
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -265,7 +303,9 @@ try:
 
             if "Action" in df_s2_hands.columns:
                 st.subheader("Hand Outcomes Overview")
-                action_counts = df_s2_hands["Action"].value_counts().reset_index()
+                action_counts = (
+                    df_s2_hands["Action"].value_counts().reset_index()
+                )
                 action_counts.columns = ["Action", "Count"]
 
                 fig_actions = px.bar(

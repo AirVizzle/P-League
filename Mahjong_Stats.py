@@ -16,6 +16,14 @@ EAST_PLAYERS = ["Victor", "John", "Emily", "Presten", "Thomas", "Eli"]
 SOUTH_PLAYERS = ["Tyler", "Jess", "Aaron", "Phonzo", "George", "Josh"]
 ALL_PLAYERS = EAST_PLAYERS + SOUTH_PLAYERS
 
+# MVP Calculation Weights
+MVP_WEIGHTS = {
+    "riichi": 8,
+    "tsumo": 15,
+    "ron": 12,
+    "dealInMultiplier": 200,  # (rate * 100 * 2)
+}
+
 
 # 3. Load & Sync Data into SQLite
 @st.cache_data(ttl=60)
@@ -47,9 +55,8 @@ def load_and_sync_data():
     return True
 
 
-# 4. Helper Function: Calculate Standings & Placements from Game Log (using net Uma)
+# 4. Helper Function: Calculate Standings & Placements from Game Log
 def calculate_standings_from_game_log(df_log):
-    # Initialize baseline dictionary for all 12 players
     stats = {
         p: {
             "Games": 0,
@@ -63,10 +70,13 @@ def calculate_standings_from_game_log(df_log):
     }
 
     if not df_log.empty and "Score 1" in df_log.columns:
-        # Loop through games that have scores recorded
         for _, row in df_log.iterrows():
             score_1 = str(row.get("Score 1", "")).strip()
-            if pd.notna(row.get("Score 1")) and score_1 not in ["", "nan"]:
+            if (
+                pd.notna(row.get("Score 1"))
+                and score_1 not in ["", "nan"]
+                and score_1 != "0"
+            ):
                 game_players = []
                 for i in range(1, 5):
                     p = str(row.get(f"Player {i}", "")).strip()
@@ -77,31 +87,24 @@ def calculate_standings_from_game_log(df_log):
                     if p and p in stats:
                         game_players.append((p, s))
 
-                if game_players:
-                    # Sort players by game score descending to determine rank
+                if len(game_players) == 4:
                     game_players.sort(key=lambda x: x[1], reverse=True)
                     placements = ["1st", "2nd", "3rd", "4th"]
 
                     for rank_idx, (p_name, score) in enumerate(game_players):
                         stats[p_name]["Games"] += 1
-                        stats[p_name][
-                            "Uma / Points"
-                        ] += score  # Sums final net Uma points
-                        if rank_idx < 4:
-                            stats[p_name][placements[rank_idx]] += 1
+                        stats[p_name]["Uma / Points"] += score
+                        stats[p_name][placements[rank_idx]] += 1
 
-    # Convert to DataFrame
     df = pd.DataFrame.from_dict(stats, orient="index").reset_index()
     df.rename(columns={"index": "Player"}, inplace=True)
 
-    # Assign Conference
     df["Conference"] = df["Player"].apply(
         lambda x: "East"
         if x in EAST_PLAYERS
         else ("South" if x in SOUTH_PLAYERS else "Other")
     )
 
-    # Sort by Net Uma Points descending, then 1st place finishes
     df.sort_values(
         by=["Uma / Points", "1st", "2nd"], ascending=False, inplace=True
     )
@@ -109,7 +112,64 @@ def calculate_standings_from_game_log(df_log):
     return df
 
 
-# 5. Helper Function: Generate Dynamic Weekly Ticker
+# 5. Helper Function: Calculate MVP & Category Leaders from Hand Logs
+def calculate_leaders_and_mvp(df_hands):
+    mvp_stats = {
+        p: {"riichi": 0, "tsumo": 0, "ron": 0, "dealIns": 0, "hands": 0}
+        for p in ALL_PLAYERS
+    }
+
+    if not df_hands.empty:
+        # Standardize column names
+        df_hands.columns = df_hands.columns.str.strip()
+
+        for _, row in df_hands.iterrows():
+            action = str(row.get("Action", "")).strip()
+            winner = str(row.get("Winner", "")).strip()
+            payer = str(row.get("Payer", "")).strip()
+            riichi_caller = str(row.get("Riichi", "")).strip()
+
+            # Track Riichi Calls
+            if riichi_caller and riichi_caller in mvp_stats:
+                mvp_stats[riichi_caller]["riichi"] += 1
+
+            # Track Wins & Deals
+            if action == "Ron":
+                if winner in mvp_stats:
+                    mvp_stats[winner]["ron"] += 1
+                if payer in mvp_stats:
+                    mvp_stats[payer]["dealIns"] += 1
+            elif action == "Tsumo":
+                if winner in mvp_stats:
+                    mvp_stats[winner]["tsumo"] += 1
+
+            # Count overall active hands per player
+            for p in ALL_PLAYERS:
+                mvp_stats[p]["hands"] += 1
+
+    df_mvp = pd.DataFrame.from_dict(mvp_stats, orient="index").reset_index()
+    df_mvp.rename(columns={"index": "Player"}, inplace=True)
+
+    # Calculate Deal-In Rate & MVP Score
+    df_mvp["DealInRate"] = df_mvp.apply(
+        lambda r: (r["dealIns"] / r["hands"]) if r["hands"] > 0 else 0.0, axis=1
+    )
+
+    df_mvp["MVP Score"] = (
+        (df_mvp["riichi"] * MVP_WEIGHTS["riichi"])
+        + (df_mvp["tsumo"] * MVP_WEIGHTS["tsumo"])
+        + (df_mvp["ron"] * MVP_WEIGHTS["ron"])
+        - (df_mvp["DealInRate"] * MVP_WEIGHTS["dealInMultiplier"])
+    )
+
+    df_mvp.sort_values(by="MVP Score", ascending=False, inplace=True)
+    df_mvp.reset_index(drop=True, inplace=True)
+    df_mvp["Rank"] = df_mvp.index + 1
+
+    return df_mvp
+
+
+# 6. Helper Function: Generate Dynamic Weekly Ticker
 @st.cache_data(ttl=60)
 def get_week_ticker_text(target_week="Week 1"):
     try:
@@ -217,8 +277,9 @@ try:
 
     conn.close()
 
-    # Calculate Full Standings from Game Log
+    # Calculate Full Standings & MVP Stats
     s2_leaderboard = calculate_standings_from_game_log(df_log)
+    df_mvp = calculate_leaders_and_mvp(df_s2_hands)
 
     # Filter into East and South Conferences
     east_df = (
@@ -257,16 +318,51 @@ try:
     )
 
     with tab_standings:
+        # --- 👑 LEADING STATISTICS CARDS ---
+        st.subheader("👑 League Category Leaders")
+
+        most_rons = df_mvp.sort_values(by="ron", ascending=False).iloc[0]
+        most_tsumos = df_mvp.sort_values(by="tsumo", ascending=False).iloc[0]
+        most_riichis = df_mvp.sort_values(by="riichi", ascending=False).iloc[0]
+        least_dealins = df_mvp.sort_values(
+            by="DealInRate", ascending=True
+        ).iloc[0]
+
+        m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+        m_col1.metric(
+            "🀄 Most Rons",
+            f"{most_rons['Player']}",
+            f"{int(most_rons['ron'])} Wins",
+        )
+        m_col2.metric(
+            "🌕 Most Tsumos",
+            f"{most_tsumos['Player']}",
+            f"{int(most_tsumos['tsumo'])} Wins",
+        )
+        m_col3.metric(
+            "⚡ Most Riichis",
+            f"{most_riichis['Player']}",
+            f"{int(most_riichis['riichi'])} Calls",
+        )
+        m_col4.metric(
+            "🛡️ Lowest Deal-In Rate",
+            f"{least_dealins['Player']}",
+            f"{least_dealins['DealInRate']*100:.2f}% Rate",
+        )
+
+        st.markdown("---")
+
         left_col, right_col = st.columns([1.3, 0.7])
 
         with left_col:
             st.subheader("🏆 Season 2 Standings")
 
-            tab_overall, tab_east, tab_south = st.tabs(
+            tab_overall, tab_east, tab_south, tab_mvp = st.tabs(
                 [
                     "🌐 Overall League",
                     "🀀 East Conference",
                     "🀁 South Conference",
+                    "⭐ MVP Race",
                 ]
             )
 
@@ -283,6 +379,26 @@ try:
             with tab_south:
                 st.dataframe(
                     south_df, use_container_width=True, hide_index=True
+                )
+
+            with tab_mvp:
+                st.dataframe(
+                    df_mvp[
+                        ["Rank", "Player", "MVP Score", "DealInRate", "ron", "tsumo", "riichi"]
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "MVP Score": st.column_config.NumberColumn(
+                            "MVP Score", format="%.1f pts"
+                        ),
+                        "DealInRate": st.column_config.NumberColumn(
+                            "Deal-In Rate", format="%.2f%%"
+                        ),
+                        "ron": "Rons",
+                        "tsumo": "Tsumos",
+                        "riichi": "Riichis",
+                    },
                 )
 
         with right_col:

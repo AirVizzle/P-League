@@ -10,7 +10,8 @@ st.set_page_config(page_title="Mahjong League - Home", layout="wide")
 SEASON_1_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=170190578&single=true&output=csv"
 SEASON_2_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=983730091&single=true&output=csv"
 GAME_LOG_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=721192921&single=true&output=csv"
-# 👈 ADD YOUR PUBLISHED MVP_LOG CSV URL HERE:
+
+# Optional: Add your published MVP_LOG CSV URL here if available
 MVP_LOG_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=YOUR_MVP_LOG_GID_HERE&single=true&output=csv"
 
 # Conference Rosters
@@ -57,7 +58,7 @@ def load_and_sync_data():
         df_mvp_log = pd.read_csv(MVP_LOG_URL)
         df_mvp_log.columns = df_mvp_log.columns.str.strip()
         df_mvp_log.to_sql("mvp_log", conn, if_exists="replace", index=False)
-    except Exception as e:
+    except Exception:
         pass
 
     conn.close()
@@ -121,57 +122,86 @@ def calculate_standings_from_game_log(df_log):
     return df
 
 
-# 5. Helper Function: Process MVP & Deal-In Rate from MVP_Log
-def calculate_leaders_and_mvp(df_mvp_raw):
-    if df_mvp_raw.empty:
-        # Fallback empty structure
-        df_empty = pd.DataFrame(
-            columns=[
-                "Rank",
-                "Player",
-                "MVP Score",
-                "DealInRate",
-                "ron",
-                "tsumo",
-                "riichi",
-                "dealIns",
-            ]
-        )
-        return df_empty
+# 5. Helper Function: Process MVP & Deal-In Rate (With Automatic Fallback)
+def calculate_leaders_and_mvp(df_mvp_raw, df_hands):
+    # --- Priority 1: Use MVP_Log if populated ---
+    if not df_mvp_raw.empty and len(df_mvp_raw) > 0:
+        df_mvp = df_mvp_raw.copy()
+        col_map = {
+            "Player Name": "Player",
+            "Riichi's": "riichi",
+            "Tsumo's": "tsumo",
+            "Ron's": "ron",
+            "Deal-In's": "dealIns",
+            "Hands Played": "hands",
+        }
+        df_mvp.rename(columns=col_map, inplace=True)
 
-    df_mvp = df_mvp_raw.copy()
+        for col in ["riichi", "tsumo", "ron", "dealIns", "hands"]:
+            if col in df_mvp.columns:
+                df_mvp[col] = (
+                    pd.to_numeric(df_mvp[col], errors="coerce")
+                    .fillna(0)
+                    .astype(int)
+                )
 
-    # Normalize column names to match Google Sheet exact names
-    col_map = {
-        "Player Name": "Player",
-        "Riichi's": "riichi",
-        "Tsumo's": "tsumo",
-        "Ron's": "ron",
-        "Deal-In's": "dealIns",
-        "Hands Played": "hands",
-    }
-    df_mvp.rename(columns=col_map, inplace=True)
-
-    # Ensure numeric columns
-    for col in ["riichi", "tsumo", "ron", "dealIns", "hands"]:
-        if col in df_mvp.columns:
-            df_mvp[col] = (
-                pd.to_numeric(df_mvp[col], errors="coerce").fillna(0).astype(int)
+        if "hands" in df_mvp.columns and "dealIns" in df_mvp.columns:
+            df_mvp["DealInRate"] = df_mvp.apply(
+                lambda r: (r["dealIns"] / r["hands"]) if r["hands"] > 0 else 0.0,
+                axis=1,
             )
+            df_mvp["MVP Score"] = (
+                (df_mvp["riichi"] * MVP_WEIGHTS["riichi"])
+                + (df_mvp["tsumo"] * MVP_WEIGHTS["tsumo"])
+                + (df_mvp["ron"] * MVP_WEIGHTS["ron"])
+                - (df_mvp["DealInRate"] * MVP_WEIGHTS["dealInMultiplier"])
+            )
+            df_mvp.sort_values(by="MVP Score", ascending=False, inplace=True)
+            df_mvp.reset_index(drop=True, inplace=True)
+            df_mvp["Rank"] = df_mvp.index + 1
+            return df_mvp
 
-    # Calculate Deal-In Rate as a pure fraction (e.g., 1 / 25 = 0.04)
+    # --- Priority 2: Dynamic Fallback from Season 2 Hands ---
+    mvp_stats = {
+        p: {"riichi": 0, "tsumo": 0, "ron": 0, "dealIns": 0, "hands": 0}
+        for p in ALL_PLAYERS
+    }
+
+    if not df_hands.empty:
+        df_hands.columns = df_hands.columns.str.strip()
+        for _, row in df_hands.iterrows():
+            action = str(row.get("Action", "")).strip()
+            winner = str(row.get("Winner", "")).strip()
+            payer = str(row.get("Payer", "")).strip()
+            riichi_caller = str(row.get("Riichi", "")).strip()
+
+            if riichi_caller in mvp_stats:
+                mvp_stats[riichi_caller]["riichi"] += 1
+
+            if action == "Ron":
+                if winner in mvp_stats:
+                    mvp_stats[winner]["ron"] += 1
+                if payer in mvp_stats:
+                    mvp_stats[payer]["dealIns"] += 1
+            elif action == "Tsumo":
+                if winner in mvp_stats:
+                    mvp_stats[winner]["tsumo"] += 1
+
+            for p in [winner, payer, riichi_caller]:
+                if p in mvp_stats:
+                    mvp_stats[p]["hands"] += 1
+
+    df_mvp = pd.DataFrame.from_dict(mvp_stats, orient="index").reset_index()
+    df_mvp.rename(columns={"index": "Player"}, inplace=True)
     df_mvp["DealInRate"] = df_mvp.apply(
         lambda r: (r["dealIns"] / r["hands"]) if r["hands"] > 0 else 0.0, axis=1
     )
-
-    # MVP Formula: (Riichi*8) + (Tsumo*15) + (Ron*12) - (DealInRate * 200)
     df_mvp["MVP Score"] = (
         (df_mvp["riichi"] * MVP_WEIGHTS["riichi"])
         + (df_mvp["tsumo"] * MVP_WEIGHTS["tsumo"])
         + (df_mvp["ron"] * MVP_WEIGHTS["ron"])
         - (df_mvp["DealInRate"] * MVP_WEIGHTS["dealInMultiplier"])
     )
-
     df_mvp.sort_values(by="MVP Score", ascending=False, inplace=True)
     df_mvp.reset_index(drop=True, inplace=True)
     df_mvp["Rank"] = df_mvp.index + 1
@@ -310,7 +340,7 @@ try:
 
     # Calculate Full Standings & MVP Stats
     s2_leaderboard = calculate_standings_from_game_log(df_log)
-    df_mvp = calculate_leaders_and_mvp(df_mvp_raw)
+    df_mvp = calculate_leaders_and_mvp(df_mvp_raw, df_s2_hands)
 
     east_df = (
         s2_leaderboard[s2_leaderboard["Conference"] == "East"]
@@ -467,6 +497,11 @@ try:
                                 "Riichis", format="%d"
                             ),
                         },
+                    )
+                else:
+                    st.info(
+                        "⭐ MVP calculations will display here once Season 2"
+                        " hands are logged."
                     )
 
         with right_col:

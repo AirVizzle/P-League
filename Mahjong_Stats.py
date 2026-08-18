@@ -114,59 +114,66 @@ def calculate_standings_from_game_log(df_log):
 
 # 5. Helper Function: Calculate MVP & Category Leaders from Hand Logs
 def calculate_leaders_and_mvp(df_hands):
-    mvp_stats = {
-        p: {"riichi": 0, "tsumo": 0, "ron": 0, "dealIns": 0, "hands": 0}
-        for p in ALL_PLAYERS
-    }
+  mvp_stats = {
+      p: {'riichi': 0, 'tsumo': 0, 'ron': 0, 'dealIns': 0, 'hands': 0}
+      for p in ALL_PLAYERS
+  }
 
-    if not df_hands.empty:
-        # Standardize column names
-        df_hands.columns = df_hands.columns.str.strip()
+  if not df_hands.empty:
+    df_hands.columns = df_hands.columns.str.strip()
 
-        for _, row in df_hands.iterrows():
-            action = str(row.get("Action", "")).strip()
-            winner = str(row.get("Winner", "")).strip()
-            payer = str(row.get("Payer", "")).strip()
-            riichi_caller = str(row.get("Riichi", "")).strip()
+    for _, row in df_hands.iterrows():
+      action = str(row.get('Action', '')).strip()
+      winner = str(row.get('Winner', '')).strip()
+      payer = str(row.get('Payer', '')).strip()
+      riichi_caller = str(row.get('Riichi', '')).strip()
 
-            # Track Riichi Calls
-            if riichi_caller and riichi_caller in mvp_stats:
-                mvp_stats[riichi_caller]["riichi"] += 1
+      # Track Riichi Calls
+      if riichi_caller and riichi_caller in mvp_stats:
+        mvp_stats[riichi_caller]['riichi'] += 1
 
-            # Track Wins & Deals
-            if action == "Ron":
-                if winner in mvp_stats:
-                    mvp_stats[winner]["ron"] += 1
-                if payer in mvp_stats:
-                    mvp_stats[payer]["dealIns"] += 1
-            elif action == "Tsumo":
-                if winner in mvp_stats:
-                    mvp_stats[winner]["tsumo"] += 1
+      # Track Wins & Deal-Ins
+      if action == 'Ron':
+        if winner in mvp_stats:
+          mvp_stats[winner]['ron'] += 1
+        if payer in mvp_stats:
+          mvp_stats[payer]['dealIns'] += 1
+      elif action == 'Tsumo':
+        if winner in mvp_stats:
+          mvp_stats[winner]['tsumo'] += 1
 
-            # Count overall active hands per player
-            for p in ALL_PLAYERS:
-                mvp_stats[p]["hands"] += 1
+      # Only increment hands played for active players in this specific row/table
+      # If your hand sheet lists participating table players, match them here.
+      # Otherwise, increment hands for the winner, payer, or riichi callers:
+      active_players_in_hand = set()
+      for p in [winner, payer, riichi_caller]:
+        if p in mvp_stats:
+          active_players_in_hand.add(p)
 
-    df_mvp = pd.DataFrame.from_dict(mvp_stats, orient="index").reset_index()
-    df_mvp.rename(columns={"index": "Player"}, inplace=True)
+      for p in active_players_in_hand:
+        mvp_stats[p]['hands'] += 1
 
-    # Calculate Deal-In Rate & MVP Score
-    df_mvp["DealInRate"] = df_mvp.apply(
-        lambda r: (r["dealIns"] / r["hands"]) if r["hands"] > 0 else 0.0, axis=1
-    )
+  df_mvp = pd.DataFrame.from_dict(mvp_stats, orient='index').reset_index()
+  df_mvp.rename(columns={'index': 'Player'}, inplace=True)
 
-    df_mvp["MVP Score"] = (
-        (df_mvp["riichi"] * MVP_WEIGHTS["riichi"])
-        + (df_mvp["tsumo"] * MVP_WEIGHTS["tsumo"])
-        + (df_mvp["ron"] * MVP_WEIGHTS["ron"])
-        - (df_mvp["DealInRate"] * MVP_WEIGHTS["dealInMultiplier"])
-    )
+  # Calculate Deal-In Rate as a pure decimal ratio (e.g. 5/25 = 0.20)
+  df_mvp['DealInRate'] = df_mvp.apply(
+      lambda r: (r['dealIns'] / r['hands']) if r['hands'] > 0 else 0.0, axis=1
+  )
 
-    df_mvp.sort_values(by="MVP Score", ascending=False, inplace=True)
-    df_mvp.reset_index(drop=True, inplace=True)
-    df_mvp["Rank"] = df_mvp.index + 1
+  # MVP Formula: (Riichi*8) + (Tsumo*15) + (Ron*12) - (DealInRate * 200)
+  df_mvp['MVP Score'] = (
+      (df_mvp['riichi'] * MVP_WEIGHTS['riichi'])
+      + (df_mvp['tsumo'] * MVP_WEIGHTS['tsumo'])
+      + (df_mvp['ron'] * MVP_WEIGHTS['ron'])
+      - (df_mvp['DealInRate'] * MVP_WEIGHTS['dealInMultiplier'])
+  )
 
-    return df_mvp
+  df_mvp.sort_values(by='MVP Score', ascending=False, inplace=True)
+  df_mvp.reset_index(drop=True, inplace=True)
+  df_mvp['Rank'] = df_mvp.index + 1
+
+  return df_mvp
 
 
 # 6. Helper Function: Generate Dynamic Weekly Ticker (Auto-Detects Latest Week & Strips Decimals)

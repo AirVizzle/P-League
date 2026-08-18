@@ -528,9 +528,11 @@ try:
             st.plotly_chart(fig, use_container_width=True)
 
     with tab_hands:
-        st.subheader("Recent Season 2 Hands")
+        st.subheader("Recent Season 2 Hands (Newest First)")
         if not df_s2_hands.empty:
-            st.dataframe(df_s2_hands.head(10), use_container_width=True)
+            # Reverses dataframe so newest entries appear at the top
+            recent_hands = df_s2_hands.tail(10).iloc[::-1]
+            st.dataframe(recent_hands, use_container_width=True, hide_index=True)
 
             if "Action" in df_s2_hands.columns:
                 st.subheader("Hand Outcomes Overview")

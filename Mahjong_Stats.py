@@ -169,17 +169,20 @@ def calculate_leaders_and_mvp(df_hands):
     return df_mvp
 
 
-# 6. Helper Function: Generate Dynamic Weekly Ticker
+# 6. Helper Function: Generate Dynamic Weekly Ticker (Auto-Detects Latest Week & Strips Decimals)
 @st.cache_data(ttl=60)
-def get_week_ticker_text(target_week="Week 1"):
+def get_week_ticker_text():
     try:
         df = pd.read_csv(GAME_LOG_URL)
         df.columns = df.columns.str.strip()
         ticker_items = []
 
-        week_games = (
-            df[df["Week"] == target_week] if "Week" in df.columns else df
-        )
+        if "Week" in df.columns and not df["Week"].dropna().empty:
+            target_week = df["Week"].dropna().iloc[-1]
+            week_games = df[df["Week"] == target_week]
+        else:
+            target_week = "Latest Matches"
+            week_games = df
 
         for _, row in week_games.iterrows():
             group = (
@@ -188,10 +191,18 @@ def get_week_ticker_text(target_week="Week 1"):
             score_1 = str(row.get("Score 1", "")).strip()
 
             if pd.notna(row.get("Score 1")) and score_1 not in ["", "nan"]:
-                p1, s1 = row.get("Player 1", ""), row.get("Score 1", 0)
-                p2, s2 = row.get("Player 2", ""), row.get("Score 2", 0)
-                p3, s3 = row.get("Player 3", ""), row.get("Score 3", 0)
-                p4, s4 = row.get("Player 4", ""), row.get("Score 4", 0)
+                p1, s1 = row.get("Player 1", ""), int(
+                    float(row.get("Score 1", 0))
+                )
+                p2, s2 = row.get("Player 2", ""), int(
+                    float(row.get("Score 2", 0))
+                )
+                p3, s3 = row.get("Player 3", ""), int(
+                    float(row.get("Score 3", 0))
+                )
+                p4, s4 = row.get("Player 4", ""), int(
+                    float(row.get("Score 4", 0))
+                )
 
                 match_str = f"🏆 [{target_week} - {group} Result]: {p1} ({s1}) | {p2} ({s2}) | {p3} ({s3}) | {p4} ({s4})"
             else:
@@ -223,8 +234,8 @@ def get_week_ticker_text(target_week="Week 1"):
 try:
     load_and_sync_data()
 
-    # Ticker HTML
-    ticker_text = get_week_ticker_text(target_week="Week 1")
+    # Ticker HTML (Auto-Detects Latest Week)
+    ticker_text = get_week_ticker_text()
     ticker_html = f"""
     <style>
     .ticker-wrap {{
@@ -267,6 +278,12 @@ try:
 
     try:
         df_s2_hands = pd.read_sql_query("SELECT * FROM season_2_hands", conn)
+        if "Points" in df_s2_hands.columns:
+            df_s2_hands["Points"] = (
+                pd.to_numeric(df_s2_hands["Points"], errors="coerce")
+                .fillna(0)
+                .astype(int)
+            )
     except Exception:
         df_s2_hands = pd.DataFrame()
 
@@ -295,6 +312,15 @@ try:
     overall_df = s2_leaderboard.drop(columns=["Conference"]).reset_index(
         drop=True
     )
+
+    # Standard Column Formatters to drop decimals from integers
+    int_col_config = {
+        "1st": st.column_config.NumberColumn(format="%d"),
+        "2nd": st.column_config.NumberColumn(format="%d"),
+        "3rd": st.column_config.NumberColumn(format="%d"),
+        "4th": st.column_config.NumberColumn(format="%d"),
+        "Games": st.column_config.NumberColumn(format="%d"),
+    }
 
     # --- Live Metric Cards ---
     col1, col2, col3 = st.columns(3)
@@ -368,36 +394,60 @@ try:
 
             with tab_overall:
                 st.dataframe(
-                    overall_df, use_container_width=True, hide_index=True
+                    overall_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config=int_col_config,
                 )
 
             with tab_east:
                 st.dataframe(
-                    east_df, use_container_width=True, hide_index=True
+                    east_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config=int_col_config,
                 )
 
             with tab_south:
                 st.dataframe(
-                    south_df, use_container_width=True, hide_index=True
+                    south_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config=int_col_config,
                 )
 
             with tab_mvp:
                 st.dataframe(
                     df_mvp[
-                        ["Rank", "Player", "MVP Score", "DealInRate", "ron", "tsumo", "riichi"]
+                        [
+                            "Rank",
+                            "Player",
+                            "MVP Score",
+                            "DealInRate",
+                            "ron",
+                            "tsumo",
+                            "riichi",
+                        ]
                     ],
                     use_container_width=True,
                     hide_index=True,
                     column_config={
+                        "Rank": st.column_config.NumberColumn(format="%d"),
                         "MVP Score": st.column_config.NumberColumn(
                             "MVP Score", format="%.1f pts"
                         ),
                         "DealInRate": st.column_config.NumberColumn(
                             "Deal-In Rate", format="%.2f%%"
                         ),
-                        "ron": "Rons",
-                        "tsumo": "Tsumos",
-                        "riichi": "Riichis",
+                        "ron": st.column_config.NumberColumn(
+                            "Rons", format="%d"
+                        ),
+                        "tsumo": st.column_config.NumberColumn(
+                            "Tsumos", format="%d"
+                        ),
+                        "riichi": st.column_config.NumberColumn(
+                            "Riichis", format="%d"
+                        ),
                     },
                 )
 
@@ -438,7 +488,17 @@ try:
     with tab_schedule:
         st.subheader("Match Log & Upcoming Tables")
         if not df_log.empty:
-            st.dataframe(df_log, use_container_width=True, hide_index=True)
+            st.dataframe(
+                df_log,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Score 1": st.column_config.NumberColumn(format="%d"),
+                    "Score 2": st.column_config.NumberColumn(format="%d"),
+                    "Score 3": st.column_config.NumberColumn(format="%d"),
+                    "Score 4": st.column_config.NumberColumn(format="%d"),
+                },
+            )
         else:
             st.info("No match log data found.")
 

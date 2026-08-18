@@ -122,86 +122,98 @@ def calculate_standings_from_game_log(df_log):
     return df
 
 
-# 5. Helper Function: Process MVP & Deal-In Rate (With Automatic Fallback)
+# 5. Helper Function: Process MVP & Deal-In Rate (Corrected Math & Column Names)
 def calculate_leaders_and_mvp(df_mvp_raw, df_hands):
-    # --- Priority 1: Use MVP_Log if populated ---
+    # --- Priority 1: Use MVP_Log from Google Sheets if loaded ---
     if not df_mvp_raw.empty and len(df_mvp_raw) > 0:
         df_mvp = df_mvp_raw.copy()
+
+        # Standardize column headers from Google Sheet tab
         col_map = {
             "Player Name": "Player",
             "Riichi's": "riichi",
             "Tsumo's": "tsumo",
             "Ron's": "ron",
             "Deal-In's": "dealIns",
-            "Hands Played": "hands",
+            "Hands Played": "hands"
         }
         df_mvp.rename(columns=col_map, inplace=True)
 
         for col in ["riichi", "tsumo", "ron", "dealIns", "hands"]:
             if col in df_mvp.columns:
-                df_mvp[col] = (
-                    pd.to_numeric(df_mvp[col], errors="coerce")
-                    .fillna(0)
-                    .astype(int)
-                )
+                df_mvp[col] = pd.to_numeric(df_mvp[col], errors="coerce").fillna(0).astype(int)
 
         if "hands" in df_mvp.columns and "dealIns" in df_mvp.columns:
+            # Pure decimal ratio: 1 / 25 = 0.04 (Streamlit format="%.2f%%" renders this as 4.00%)
             df_mvp["DealInRate"] = df_mvp.apply(
-                lambda r: (r["dealIns"] / r["hands"]) if r["hands"] > 0 else 0.0,
-                axis=1,
+                lambda r: (r["dealIns"] / float(r["hands"])) if r["hands"] > 0 else 0.0, axis=1
             )
+
+            # MVP Formula: (Riichi*8) + (Tsumo*15) + (Ron*12) - (DealInRate * 200)
             df_mvp["MVP Score"] = (
-                (df_mvp["riichi"] * MVP_WEIGHTS["riichi"])
-                + (df_mvp["tsumo"] * MVP_WEIGHTS["tsumo"])
-                + (df_mvp["ron"] * MVP_WEIGHTS["ron"])
-                - (df_mvp["DealInRate"] * MVP_WEIGHTS["dealInMultiplier"])
+                    (df_mvp["riichi"] * MVP_WEIGHTS["riichi"]) +
+                    (df_mvp["tsumo"] * MVP_WEIGHTS["tsumo"]) +
+                    (df_mvp["ron"] * MVP_WEIGHTS["ron"]) -
+                    (df_mvp["DealInRate"] * MVP_WEIGHTS["dealInMultiplier"])
             )
+
             df_mvp.sort_values(by="MVP Score", ascending=False, inplace=True)
             df_mvp.reset_index(drop=True, inplace=True)
             df_mvp["Rank"] = df_mvp.index + 1
             return df_mvp
 
-    # --- Priority 2: Dynamic Fallback from Season 2 Hands ---
-    mvp_stats = {
-        p: {"riichi": 0, "tsumo": 0, "ron": 0, "dealIns": 0, "hands": 0}
-        for p in ALL_PLAYERS
-    }
+    # --- Priority 2: Fallback from Hand Events Sheet ---
+    mvp_stats = {p: {"riichi": 0, "tsumo": 0, "ron": 0, "dealIns": 0, "hands": 0} for p in ALL_PLAYERS}
 
     if not df_hands.empty:
         df_hands.columns = df_hands.columns.str.strip()
+
+        # Find Riichi column flexible name (Column H)
+        riichi_col = None
+        for col in ["Riichi", "Riichi's", "Riichi Callers", "Column H", "H"]:
+            if col in df_hands.columns:
+                riichi_col = col
+                break
+
         for _, row in df_hands.iterrows():
             action = str(row.get("Action", "")).strip()
             winner = str(row.get("Winner", "")).strip()
             payer = str(row.get("Payer", "")).strip()
-            riichi_caller = str(row.get("Riichi", "")).strip()
 
-            if riichi_caller in mvp_stats:
-                mvp_stats[riichi_caller]["riichi"] += 1
+            # Check Riichi Callers (Column H)
+            riichi_caller = str(row.get(riichi_col, "")) if riichi_col else ""
+
+            for caller in riichi_caller.split(","):
+                c_clean = caller.strip()
+                if c_clean in mvp_stats:
+                    mvp_stats[c_clean]["riichi"] += 1
 
             if action == "Ron":
-                if winner in mvp_stats:
-                    mvp_stats[winner]["ron"] += 1
-                if payer in mvp_stats:
-                    mvp_stats[payer]["dealIns"] += 1
+                if winner in mvp_stats: mvp_stats[winner]["ron"] += 1
+                if payer in mvp_stats: mvp_stats[payer]["dealIns"] += 1
             elif action == "Tsumo":
-                if winner in mvp_stats:
-                    mvp_stats[winner]["tsumo"] += 1
+                if winner in mvp_stats: mvp_stats[winner]["tsumo"] += 1
 
-            for p in [winner, payer, riichi_caller]:
+            # Count hands played per active participant
+            active_players = set([winner, payer] + [c.strip() for c in riichi_caller.split(",") if c.strip()])
+            for p in active_players:
                 if p in mvp_stats:
                     mvp_stats[p]["hands"] += 1
 
     df_mvp = pd.DataFrame.from_dict(mvp_stats, orient="index").reset_index()
     df_mvp.rename(columns={"index": "Player"}, inplace=True)
+
     df_mvp["DealInRate"] = df_mvp.apply(
-        lambda r: (r["dealIns"] / r["hands"]) if r["hands"] > 0 else 0.0, axis=1
+        lambda r: (r["dealIns"] / float(r["hands"])) if r["hands"] > 0 else 0.0, axis=1
     )
+
     df_mvp["MVP Score"] = (
-        (df_mvp["riichi"] * MVP_WEIGHTS["riichi"])
-        + (df_mvp["tsumo"] * MVP_WEIGHTS["tsumo"])
-        + (df_mvp["ron"] * MVP_WEIGHTS["ron"])
-        - (df_mvp["DealInRate"] * MVP_WEIGHTS["dealInMultiplier"])
+            (df_mvp["riichi"] * MVP_WEIGHTS["riichi"]) +
+            (df_mvp["tsumo"] * MVP_WEIGHTS["tsumo"]) +
+            (df_mvp["ron"] * MVP_WEIGHTS["ron"]) -
+            (df_mvp["DealInRate"] * MVP_WEIGHTS["dealInMultiplier"])
     )
+
     df_mvp.sort_values(by="MVP Score", ascending=False, inplace=True)
     df_mvp.reset_index(drop=True, inplace=True)
     df_mvp["Rank"] = df_mvp.index + 1

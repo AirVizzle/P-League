@@ -50,9 +50,9 @@ def calculate_standings_from_game_log(df_log):
         for _, row in df_log.iterrows():
             score_1 = str(row.get("Score 1", "")).strip()
             if (
-                    pd.notna(row.get("Score 1"))
-                    and score_1 not in ["", "nan"]
-                    and score_1 != "0"
+                pd.notna(row.get("Score 1"))
+                and score_1 not in ["", "nan"]
+                and score_1 != "0"
             ):
                 game_players = []
                 for i in range(1, 5):
@@ -75,8 +75,14 @@ def calculate_standings_from_game_log(df_log):
                         stats[p_name]["Uma / Points"] += net_uma
                         stats[p_name][placements[rank_idx]] += 1
 
-    df = pd.DataFrame.from_dict(stats, orient="index")
-    df = df.rename_axis("Player").reset_index()
+    # Convert dictionary to list of records to completely bypass Pandas RangeIndex/rename bugs
+    rows = []
+    for player_name, data in stats.items():
+        row_dict = {"Player": player_name}
+        row_dict.update(data)
+        rows.append(row_dict)
+
+    df = pd.DataFrame(rows)
 
     df["Conference"] = df["Player"].apply(
         lambda x: "East"
@@ -96,13 +102,17 @@ def load_raw_mvp_data(df_mvp_raw):
     if not df_mvp_raw.empty and len(df_mvp_raw) > 0:
         df_mvp = df_mvp_raw.copy()
 
-        col_map = {
-            "Total MVP Score": "Score",
-            "MVP Score": "Score",
-            "Deal-in Rate": "Deal-In Rate",
-            "Deal In Rate": "Deal-In Rate"
-        }
-        df_mvp = df_mvp.rename(columns=col_map)
+        # Safely map columns without modifying DataFrame Index metadata
+        rename_dict = {}
+        for col in df_mvp.columns:
+            str_col = str(col).strip()
+            if str_col in ["Total MVP Score", "MVP Score"]:
+                rename_dict[col] = "Score"
+            elif str_col in ["Deal-in Rate", "Deal In Rate"]:
+                rename_dict[col] = "Deal-In Rate"
+
+        if rename_dict:
+            df_mvp = df_mvp.rename(columns=rename_dict)
 
         if "Score" in df_mvp.columns:
             df_mvp["Score"] = pd.to_numeric(df_mvp["Score"], errors="coerce").fillna(0.0)
@@ -388,12 +398,13 @@ try:
                     .value_counts()
                     .reset_index()
                 )
+                action_counts.columns = ["Action", "Count"]
 
                 fig_actions = px.bar(
                     action_counts,
-                    x=action_counts.columns[0],
-                    y=action_counts.columns[1],
-                    color=action_counts.columns[0],
+                    x="Action",
+                    y="Count",
+                    color="Action",
                     title="Total Actions Played (Season 2)",
                 )
                 st.plotly_chart(fig_actions, use_container_width=True)

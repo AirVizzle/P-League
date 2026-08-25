@@ -65,7 +65,7 @@ def load_and_sync_data():
     return True
 
 
-# 4. Helper Function: Calculate Standings & Placements from Game Log
+# 4. Helper Function: Calculate Standings & Placements from Game Log (Standard +30/+10/-10/-30 Net Uma)
 def calculate_standings_from_game_log(df_log):
     stats = {
         p: {
@@ -78,6 +78,9 @@ def calculate_standings_from_game_log(df_log):
         }
         for p in ALL_PLAYERS
     }
+
+    # Standard Placement Uma (+30, +10, -10, -30)
+    UMA_TIERS = [30.0, 10.0, -10.0, -30.0]
 
     if not df_log.empty and "Score 1" in df_log.columns:
         for _, row in df_log.iterrows():
@@ -98,12 +101,16 @@ def calculate_standings_from_game_log(df_log):
                         game_players.append((p, s))
 
                 if len(game_players) == 4:
+                    # Sort players descending by raw final score
                     game_players.sort(key=lambda x: x[1], reverse=True)
                     placements = ["1st", "2nd", "3rd", "4th"]
 
-                    for rank_idx, (p_name, score) in enumerate(game_players):
+                    for rank_idx, (p_name, raw_score) in enumerate(game_players):
+                        # Convert raw score to Net Uma: (score - 30000)/1000 + placement_uma (+30/+10/-10/-30)
+                        net_uma = ((raw_score - 30000.0) / 1000.0) + UMA_TIERS[rank_idx]
+
                         stats[p_name]["Games"] += 1
-                        stats[p_name]["Uma / Points"] += score
+                        stats[p_name]["Uma / Points"] += net_uma
                         stats[p_name][placements[rank_idx]] += 1
 
     df = pd.DataFrame.from_dict(stats, orient="index").reset_index()
@@ -374,6 +381,7 @@ try:
         "3rd": st.column_config.NumberColumn(format="%d"),
         "4th": st.column_config.NumberColumn(format="%d"),
         "Games": st.column_config.NumberColumn(format="%d"),
+        "Uma / Points": st.column_config.NumberColumn(format="%+.1f"),
     }
 
     # --- Live Metric Cards ---
@@ -530,7 +538,6 @@ try:
     with tab_hands:
         st.subheader("Recent Season 2 Hands (Newest First)")
         if not df_s2_hands.empty:
-            # Reverses dataframe so newest entries appear at the top
             recent_hands = df_s2_hands.tail(10).iloc[::-1]
             st.dataframe(recent_hands, use_container_width=True, hide_index=True)
 

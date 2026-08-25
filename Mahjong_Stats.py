@@ -12,7 +12,7 @@ SEASON_2_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzB
 GAME_LOG_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=721192921&single=true&output=csv"
 
 # Published CSV link for your MVP tab
-MVP_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=1774839977&single=true&output=csv"
+MVP_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=YOUR_MVP_TAB_GID_HERE&single=true&output=csv"
 
 # Conference Rosters
 EAST_PLAYERS = ["Victor", "John", "Emily", "Presten", "Thomas", "Eli"]
@@ -392,8 +392,9 @@ try:
 
             with tab_mvp:
                 if not df_mvp.empty:
+                    display_cols = [c for c in ["Rank", "Player", "Score", "Deal-In Rate"] if c in df_mvp.columns]
                     st.dataframe(
-                        df_mvp[["Rank", "Player", "Score", "Deal-In Rate"]],
+                        df_mvp[display_cols],
                         use_container_width=True,
                         hide_index=True,
                         column_config={
@@ -432,15 +433,21 @@ try:
             if "Action" in df_s2_hands.columns:
                 st.subheader("Hand Outcomes Overview")
                 action_counts = (
-                    df_s2_hands["Action"].value_counts().reset_index()
+                    df_s2_hands["Action"]
+                    .value_counts()
+                    .reset_index()
+                    .rename(columns={"index": "Action", "Action": "Action Name", "count": "Count"})
                 )
-                action_counts.columns = ["Action", "Count"]
+
+                # Dynamic column mapping to avoid Pandas RangeIndex error
+                x_col = action_counts.columns[0]
+                y_col = action_counts.columns[1]
 
                 fig_actions = px.bar(
                     action_counts,
-                    x="Action",
-                    y="Count",
-                    color="Action",
+                    x=x_col,
+                    y=y_col,
+                    color=x_col,
                     title="Total Actions Played (Season 2)",
                 )
                 st.plotly_chart(fig_actions, use_container_width=True)

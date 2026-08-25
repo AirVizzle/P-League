@@ -86,9 +86,9 @@ def calculate_standings_from_game_log(df_log):
         for _, row in df_log.iterrows():
             score_1 = str(row.get("Score 1", "")).strip()
             if (
-                pd.notna(row.get("Score 1"))
-                and score_1 not in ["", "nan"]
-                and score_1 != "0"
+                    pd.notna(row.get("Score 1"))
+                    and score_1 not in ["", "nan"]
+                    and score_1 != "0"
             ):
                 game_players = []
                 for i in range(1, 5):
@@ -129,7 +129,7 @@ def calculate_standings_from_game_log(df_log):
     return df
 
 
-# 5. Helper Function: Process MVP & Deal-In Rate (Corrected Math & Column Names)
+# 5. Helper Function: Process MVP & Deal-In Rate (Corrected Math & Normalization)
 def calculate_leaders_and_mvp(df_mvp_raw, df_hands):
     # --- Priority 1: Use MVP_Log from Google Sheets if loaded ---
     if not df_mvp_raw.empty and len(df_mvp_raw) > 0:
@@ -142,7 +142,9 @@ def calculate_leaders_and_mvp(df_mvp_raw, df_hands):
             "Tsumo's": "tsumo",
             "Ron's": "ron",
             "Deal-In's": "dealIns",
-            "Hands Played": "hands"
+            "Hands Played": "hands",
+            "Deal-In Rate": "DealInRate",
+            "Deal In Rate": "DealInRate"
         }
         df_mvp.rename(columns=col_map, inplace=True)
 
@@ -150,24 +152,37 @@ def calculate_leaders_and_mvp(df_mvp_raw, df_hands):
             if col in df_mvp.columns:
                 df_mvp[col] = pd.to_numeric(df_mvp[col], errors="coerce").fillna(0).astype(int)
 
-        if "hands" in df_mvp.columns and "dealIns" in df_mvp.columns:
-            # Pure decimal ratio: 1 / 25 = 0.04 (Streamlit format="%.2f%%" renders this as 4.00%)
+        # Handle DealInRate calculation / normalization
+        if "DealInRate" in df_mvp.columns:
+            # Clean sheet value (e.g., convert string "15.52%" or numeric 15.52 to float)
+            df_mvp["DealInRate"] = (
+                df_mvp["DealInRate"]
+                .astype(str)
+                .str.replace("%", "", regex=False)
+            )
+            df_mvp["DealInRate"] = pd.to_numeric(df_mvp["DealInRate"], errors="coerce").fillna(0.0)
+
+            # Convert percentage whole numbers (15.52) to true decimal ratio (0.1552) for Streamlit format="%.2f%%"
+            df_mvp["DealInRate"] = df_mvp["DealInRate"].apply(lambda x: x / 100.0 if x > 1.0 else x)
+        elif "hands" in df_mvp.columns and "dealIns" in df_mvp.columns:
             df_mvp["DealInRate"] = df_mvp.apply(
                 lambda r: (r["dealIns"] / float(r["hands"])) if r["hands"] > 0 else 0.0, axis=1
             )
+        else:
+            df_mvp["DealInRate"] = 0.0
 
-            # MVP Formula: (Riichi*8) + (Tsumo*15) + (Ron*12) - (DealInRate * 200)
-            df_mvp["MVP Score"] = (
-                    (df_mvp["riichi"] * MVP_WEIGHTS["riichi"]) +
-                    (df_mvp["tsumo"] * MVP_WEIGHTS["tsumo"]) +
-                    (df_mvp["ron"] * MVP_WEIGHTS["ron"]) -
-                    (df_mvp["DealInRate"] * MVP_WEIGHTS["dealInMultiplier"])
-            )
+        # Calculate MVP Score using true decimal ratio for multiplier
+        df_mvp["MVP Score"] = (
+                (df_mvp["riichi"] * MVP_WEIGHTS["riichi"]) +
+                (df_mvp["tsumo"] * MVP_WEIGHTS["tsumo"]) +
+                (df_mvp["ron"] * MVP_WEIGHTS["ron"]) -
+                (df_mvp["DealInRate"] * MVP_WEIGHTS["dealInMultiplier"])
+        )
 
-            df_mvp.sort_values(by="MVP Score", ascending=False, inplace=True)
-            df_mvp.reset_index(drop=True, inplace=True)
-            df_mvp["Rank"] = df_mvp.index + 1
-            return df_mvp
+        df_mvp.sort_values(by="MVP Score", ascending=False, inplace=True)
+        df_mvp.reset_index(drop=True, inplace=True)
+        df_mvp["Rank"] = df_mvp.index + 1
+        return df_mvp
 
     # --- Priority 2: Fallback from Hand Events Sheet ---
     mvp_stats = {p: {"riichi": 0, "tsumo": 0, "ron": 0, "dealIns": 0, "hands": 0} for p in ALL_PLAYERS}
@@ -269,7 +284,7 @@ def get_week_ticker_text():
                     str(row.get(f"Player {i}")).strip()
                     for i in range(1, 5)
                     if pd.notna(row.get(f"Player {i}"))
-                    and str(row.get(f"Player {i}")).strip() not in ["", "nan"]
+                       and str(row.get(f"Player {i}")).strip() not in ["", "nan"]
                 ]
                 player_list_str = (
                     ", ".join(players) if players else "Players TBD"
@@ -440,7 +455,7 @@ try:
             m_col4.metric(
                 "🛡️ Lowest Deal-In Rate",
                 f"{least_dealins['Player']}",
-                f"{least_dealins['DealInRate']*100:.2f}% Rate",
+                f"{least_dealins['DealInRate'] * 100:.2f}% Rate",
             )
 
         st.markdown("---")

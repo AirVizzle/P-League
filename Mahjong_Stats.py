@@ -1,4 +1,3 @@
-import sqlite3
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -20,41 +19,15 @@ SOUTH_PLAYERS = ["Tyler", "Jess", "Aaron", "Phonzo", "George", "Josh"]
 ALL_PLAYERS = EAST_PLAYERS + SOUTH_PLAYERS
 
 
-# 3. Load & Sync Data into SQLite
+# 3. Load Data directly from Google Sheets (In-Memory Fetching)
 @st.cache_data(ttl=60)
-def load_and_sync_data():
-    conn = sqlite3.connect("mahjong_league.db")
-
+def fetch_sheet_data(url):
     try:
-        pd.read_csv(SEASON_1_URL).to_sql(
-            "season_1_hands", conn, if_exists="replace", index=False
-        )
-    except Exception as e:
-        st.warning(f"Could not load Season 1 data: {e}")
-
-    try:
-        pd.read_csv(SEASON_2_URL).to_sql(
-            "season_2_hands", conn, if_exists="replace", index=False
-        )
-    except Exception as e:
-        st.warning(f"Could not load Season 2 data: {e}")
-
-    try:
-        df_game_log = pd.read_csv(GAME_LOG_URL)
-        df_game_log.columns = df_game_log.columns.str.strip()
-        df_game_log.to_sql("game_log", conn, if_exists="replace", index=False)
-    except Exception as e:
-        st.warning(f"Could not load Game Log data: {e}")
-
-    try:
-        df_mvp = pd.read_csv(MVP_URL)
-        df_mvp.columns = df_mvp.columns.str.strip()
-        df_mvp.to_sql("mvp_table", conn, if_exists="replace", index=False)
+        df = pd.read_csv(url)
+        df.columns = df.columns.astype(str).str.strip()
+        return df
     except Exception:
-        pass
-
-    conn.close()
-    return True
+        return pd.DataFrame()
 
 
 # 4. Helper Function: Calculate Standings & Placements from Game Log (Standard +30/+10/-10/-30 Net Uma)
@@ -135,7 +108,6 @@ def load_raw_mvp_data(df_mvp_raw):
             df_mvp["Score"] = pd.to_numeric(df_mvp["Score"], errors="coerce").fillna(0.0)
             df_mvp.sort_values(by="Score", ascending=False, inplace=True)
 
-        # Standardize String Display for percentages without modifying text
         if "Deal-In Rate" in df_mvp.columns:
             df_mvp["Deal-In Rate"] = df_mvp["Deal-In Rate"].astype(str).apply(
                 lambda x: f"{x.strip().replace('%', '')}%" if x.strip() not in ["", "nan", "None"] else "0.00%"
@@ -165,8 +137,10 @@ def load_raw_mvp_data(df_mvp_raw):
 @st.cache_data(ttl=60)
 def get_week_ticker_text():
     try:
-        df = pd.read_csv(GAME_LOG_URL)
-        df.columns = df.columns.str.strip()
+        df = fetch_sheet_data(GAME_LOG_URL)
+        if df.empty:
+            return "🀄 Welcome to P League! Check match details in the schedule tab."
+
         ticker_items = []
 
         if "Week" in df.columns and not df["Week"].dropna().empty:
@@ -216,8 +190,6 @@ def get_week_ticker_text():
 
 # --- App Execution ---
 try:
-    load_and_sync_data()
-
     ticker_text = get_week_ticker_text()
     ticker_html = f"""
     <style>
@@ -257,30 +229,9 @@ try:
 
     st.title("🀄 Mahjong League Dashboard")
 
-    conn = sqlite3.connect("mahjong_league.db")
-
-    try:
-        df_s2_hands = pd.read_sql_query("SELECT * FROM season_2_hands", conn)
-        if "Points" in df_s2_hands.columns:
-            df_s2_hands["Points"] = (
-                pd.to_numeric(df_s2_hands["Points"], errors="coerce")
-                .fillna(0)
-                .astype(int)
-            )
-    except Exception:
-        df_s2_hands = pd.DataFrame()
-
-    try:
-        df_log = pd.read_sql_query("SELECT * FROM game_log", conn)
-    except Exception:
-        df_log = pd.DataFrame()
-
-    try:
-        df_mvp_raw = pd.read_sql_query("SELECT * FROM mvp_table", conn)
-    except Exception:
-        df_mvp_raw = pd.DataFrame()
-
-    conn.close()
+    df_s2_hands = fetch_sheet_data(SEASON_2_URL)
+    df_log = fetch_sheet_data(GAME_LOG_URL)
+    df_mvp_raw = fetch_sheet_data(MVP_URL)
 
     # Calculate Full Standings & MVP Stats
     s2_leaderboard = calculate_standings_from_game_log(df_log)
@@ -436,18 +387,13 @@ try:
                     df_s2_hands["Action"]
                     .value_counts()
                     .reset_index()
-                    .rename(columns={"index": "Action", "Action": "Action Name", "count": "Count"})
                 )
-
-                # Dynamic column mapping to avoid Pandas RangeIndex error
-                x_col = action_counts.columns[0]
-                y_col = action_counts.columns[1]
 
                 fig_actions = px.bar(
                     action_counts,
-                    x=x_col,
-                    y=y_col,
-                    color=x_col,
+                    x=action_counts.columns[0],
+                    y=action_counts.columns[1],
+                    color=action_counts.columns[0],
                     title="Total Actions Played (Season 2)",
                 )
                 st.plotly_chart(fig_actions, use_container_width=True)
@@ -472,4 +418,4 @@ try:
             st.info("No match log data found.")
 
 except Exception as e:
-    st.error(f"Could not load data. Check your published URLs or database: {e}")
+    st.error(f"Could not load data. Check your published URLs: {e}")

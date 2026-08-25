@@ -24,7 +24,7 @@ ALL_PLAYERS = EAST_PLAYERS + SOUTH_PLAYERS
 def fetch_sheet_data(url):
     try:
         df = pd.read_csv(url)
-        df.columns = df.columns.astype(str).str.strip()
+        df.columns = [str(col).strip() for col in df.columns]
         return df
     except Exception:
         return pd.DataFrame()
@@ -75,8 +75,8 @@ def calculate_standings_from_game_log(df_log):
                         stats[p_name]["Uma / Points"] += net_uma
                         stats[p_name][placements[rank_idx]] += 1
 
-    df = pd.DataFrame.from_dict(stats, orient="index").reset_index()
-    df.rename(columns={"index": "Player"}, inplace=True)
+    df = pd.DataFrame.from_dict(stats, orient="index")
+    df = df.rename_axis("Player").reset_index()
 
     df["Conference"] = df["Player"].apply(
         lambda x: "East"
@@ -102,7 +102,7 @@ def load_raw_mvp_data(df_mvp_raw):
             "Deal-in Rate": "Deal-In Rate",
             "Deal In Rate": "Deal-In Rate"
         }
-        df_mvp.rename(columns=col_map, inplace=True)
+        df_mvp = df_mvp.rename(columns=col_map)
 
         if "Score" in df_mvp.columns:
             df_mvp["Score"] = pd.to_numeric(df_mvp["Score"], errors="coerce").fillna(0.0)

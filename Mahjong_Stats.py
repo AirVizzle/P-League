@@ -10,16 +10,13 @@ SEASON_1_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzB
 SEASON_2_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=983730091&single=true&output=csv"
 GAME_LOG_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=721192921&single=true&output=csv"
 
-# Published CSV link for your MVP tab
-MVP_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=1774839977&single=true&output=csv"
-
 # Conference Rosters
 EAST_PLAYERS = ["Victor", "John", "Emily", "Presten", "Thomas", "Eli"]
 SOUTH_PLAYERS = ["Tyler", "Jess", "Aaron", "Phonzo", "George", "Josh"]
 ALL_PLAYERS = EAST_PLAYERS + SOUTH_PLAYERS
 
 
-# 3. Load Data directly from Google Sheets (In-Memory Fetching)
+# 3. Load Data directly from Google Sheets
 @st.cache_data(ttl=60)
 def fetch_sheet_data(url):
     try:
@@ -30,7 +27,7 @@ def fetch_sheet_data(url):
         return pd.DataFrame()
 
 
-# 4. Helper Function: Calculate Standings & Placements from Game Log (Standard +30/+10/-10/-30 Net Uma)
+# 4. Helper Function: Calculate Standings from Game Log (Standard +30/+10/-10/-30 Net Uma)
 def calculate_standings_from_game_log(df_log):
     stats = {
         p: {
@@ -75,7 +72,7 @@ def calculate_standings_from_game_log(df_log):
                         stats[p_name]["Uma / Points"] += net_uma
                         stats[p_name][placements[rank_idx]] += 1
 
-    # Convert dictionary to list of records to completely bypass Pandas RangeIndex/rename bugs
+    # Format cleanly as list of dicts to bypass Pandas index assignment bugs
     rows = []
     for player_name, data in stats.items():
         row_dict = {"Player": player_name}
@@ -97,53 +94,7 @@ def calculate_standings_from_game_log(df_log):
     return df
 
 
-# 5. Helper Function: Process Raw MVP Table directly from Google Sheet
-def load_raw_mvp_data(df_mvp_raw):
-    if not df_mvp_raw.empty and len(df_mvp_raw) > 0:
-        df_mvp = df_mvp_raw.copy()
-
-        # Safely map columns without modifying DataFrame Index metadata
-        rename_dict = {}
-        for col in df_mvp.columns:
-            str_col = str(col).strip()
-            if str_col in ["Total MVP Score", "MVP Score"]:
-                rename_dict[col] = "Score"
-            elif str_col in ["Deal-in Rate", "Deal In Rate"]:
-                rename_dict[col] = "Deal-In Rate"
-
-        if rename_dict:
-            df_mvp = df_mvp.rename(columns=rename_dict)
-
-        if "Score" in df_mvp.columns:
-            df_mvp["Score"] = pd.to_numeric(df_mvp["Score"], errors="coerce").fillna(0.0)
-            df_mvp.sort_values(by="Score", ascending=False, inplace=True)
-
-        if "Deal-In Rate" in df_mvp.columns:
-            df_mvp["Deal-In Rate"] = df_mvp["Deal-In Rate"].astype(str).apply(
-                lambda x: f"{x.strip().replace('%', '')}%" if x.strip() not in ["", "nan", "None"] else "0.00%"
-            )
-            df_mvp["DealInRate_Num"] = (
-                df_mvp["Deal-In Rate"]
-                .str.replace("%", "", regex=False)
-            )
-            df_mvp["DealInRate_Num"] = pd.to_numeric(df_mvp["DealInRate_Num"], errors="coerce").fillna(0.0)
-        else:
-            df_mvp["Deal-In Rate"] = "0.00%"
-            df_mvp["DealInRate_Num"] = 0.0
-
-        df_mvp.reset_index(drop=True, inplace=True)
-
-        if "Rank" not in df_mvp.columns:
-            df_mvp["Rank"] = df_mvp.index + 1
-        else:
-            df_mvp["Rank"] = pd.to_numeric(df_mvp["Rank"], errors="coerce").fillna(df_mvp.index + 1).astype(int)
-
-        return df_mvp
-
-    return pd.DataFrame()
-
-
-# 6. Helper Function: Generate Dynamic Weekly Ticker
+# 5. Helper Function: Generate Dynamic Weekly Ticker
 @st.cache_data(ttl=60)
 def get_week_ticker_text():
     try:
@@ -178,7 +129,7 @@ def get_week_ticker_text():
                     str(row.get(f"Player {i}")).strip()
                     for i in range(1, 5)
                     if pd.notna(row.get(f"Player {i}"))
-                       and str(row.get(f"Player {i}")).strip() not in ["", "nan"]
+                    and str(row.get(f"Player {i}")).strip() not in ["", "nan"]
                 ]
                 player_list_str = (
                     ", ".join(players) if players else "Players TBD"
@@ -241,11 +192,9 @@ try:
 
     df_s2_hands = fetch_sheet_data(SEASON_2_URL)
     df_log = fetch_sheet_data(GAME_LOG_URL)
-    df_mvp_raw = fetch_sheet_data(MVP_URL)
 
-    # Calculate Full Standings & MVP Stats
+    # Calculate Standings
     s2_leaderboard = calculate_standings_from_game_log(df_log)
-    df_mvp = load_raw_mvp_data(df_mvp_raw)
 
     east_df = (
         s2_leaderboard[s2_leaderboard["Conference"] == "East"]
@@ -292,38 +241,16 @@ try:
     )
 
     with tab_standings:
-        # --- 👑 LEADING STATISTICS CARDS ---
-        st.subheader("👑 League Category Leaders")
-
-        if not df_mvp.empty:
-            mvp_leader = df_mvp.iloc[0]
-            least_dealins = df_mvp.sort_values(by="DealInRate_Num", ascending=True).iloc[0]
-
-            m_col1, m_col2 = st.columns(2)
-            m_col1.metric(
-                "⭐ MVP Leader",
-                f"{mvp_leader['Player']}",
-                f"{mvp_leader['Score']:.1f} pts",
-            )
-            m_col2.metric(
-                "🛡️ Lowest Deal-In Rate",
-                f"{least_dealins['Player']}",
-                f"{least_dealins['Deal-In Rate']} Rate",
-            )
-
-        st.markdown("---")
-
         left_col, right_col = st.columns([1.3, 0.7])
 
         with left_col:
             st.subheader("🏆 Season 2 Standings")
 
-            tab_overall, tab_east, tab_south, tab_mvp = st.tabs(
+            tab_overall, tab_east, tab_south = st.tabs(
                 [
                     "🌐 Overall League",
                     "🀀 East Conference",
                     "🀁 South Conference",
-                    "⭐ MVP Race",
                 ]
             )
 
@@ -350,29 +277,6 @@ try:
                     hide_index=True,
                     column_config=int_col_config,
                 )
-
-            with tab_mvp:
-                if not df_mvp.empty:
-                    display_cols = [c for c in ["Rank", "Player", "Score", "Deal-In Rate"] if c in df_mvp.columns]
-                    st.dataframe(
-                        df_mvp[display_cols],
-                        use_container_width=True,
-                        hide_index=True,
-                        column_config={
-                            "Rank": st.column_config.NumberColumn(format="%d"),
-                            "Player": st.column_config.TextColumn("Player"),
-                            "Score": st.column_config.NumberColumn(
-                                "Score", format="%.1f"
-                            ),
-                            "Deal-In Rate": st.column_config.TextColumn(
-                                "Deal-In Rate"
-                            ),
-                        },
-                    )
-                else:
-                    st.info(
-                        "⭐ MVP standings will display here once MVP_URL is updated."
-                    )
 
         with right_col:
             st.subheader("📊 Points Breakdown")

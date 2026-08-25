@@ -11,8 +11,8 @@ SEASON_1_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzB
 SEASON_2_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=983730091&single=true&output=csv"
 GAME_LOG_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=721192921&single=true&output=csv"
 
-# Replace YOUR_MVP_LOG_GID_HERE with the exact published CSV GID of your MVP sheet tab
-MVP_LOG_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?output=csv"
+# Published CSV link for your MVP tab
+MVP_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRARMn8tXHFhuNzBEAuaUYdj770g60dKypHCbOsEiwI-uzHPoew_1dXekL5DGjslzt0bb5pr1BiTVu5/pub?gid=YOUR_MVP_TAB_GID_HERE&single=true&output=csv"
 
 # Conference Rosters
 EAST_PLAYERS = ["Victor", "John", "Emily", "Presten", "Thomas", "Eli"]
@@ -47,9 +47,9 @@ def load_and_sync_data():
         st.warning(f"Could not load Game Log data: {e}")
 
     try:
-        df_mvp_log = pd.read_csv(MVP_LOG_URL)
-        df_mvp_log.columns = df_mvp_log.columns.str.strip()
-        df_mvp_log.to_sql("mvp_log", conn, if_exists="replace", index=False)
+        df_mvp = pd.read_csv(MVP_URL)
+        df_mvp.columns = df_mvp.columns.str.strip()
+        df_mvp.to_sql("mvp_table", conn, if_exists="replace", index=False)
     except Exception:
         pass
 
@@ -71,7 +71,6 @@ def calculate_standings_from_game_log(df_log):
         for p in ALL_PLAYERS
     }
 
-    # Standard Placement Uma (+30, +10, -10, -30)
     UMA_TIERS = [30.0, 10.0, -10.0, -30.0]
 
     if not df_log.empty and "Score 1" in df_log.columns:
@@ -119,36 +118,30 @@ def calculate_standings_from_game_log(df_log):
     return df
 
 
-# 5. Helper Function: Pull Raw MVP Log directly from Google Sheets
-def calculate_leaders_and_mvp(df_mvp_raw):
+# 5. Helper Function: Process Raw MVP Table directly from Google Sheet
+def load_raw_mvp_data(df_mvp_raw):
     if not df_mvp_raw.empty and len(df_mvp_raw) > 0:
         df_mvp = df_mvp_raw.copy()
 
-        # Flexible column mapping matching sheet variations
         col_map = {
-            "Player Name": "Player",
-            "Riichi's": "riichi",
-            "Riichis": "riichi",
-            "Tsumo's": "tsumo",
-            "Tsumos": "tsumo",
-            "Ron's": "ron",
-            "Rons": "ron",
-            "Score": "MVP Score",
-            "Points": "MVP Score",
-            "Deal-In Rate": "DealInRate_Display",
-            "Deal In Rate": "DealInRate_Display"
+            "Total MVP Score": "Score",
+            "MVP Score": "Score",
+            "Deal-in Rate": "Deal-In Rate",
+            "Deal In Rate": "Deal-In Rate"
         }
         df_mvp.rename(columns=col_map, inplace=True)
 
-        # Standardize strings for display
-        if "DealInRate_Display" in df_mvp.columns:
-            df_mvp["Deal-In Rate"] = df_mvp["DealInRate_Display"].astype(str).apply(
+        if "Score" in df_mvp.columns:
+            df_mvp["Score"] = pd.to_numeric(df_mvp["Score"], errors="coerce").fillna(0.0)
+            df_mvp.sort_values(by="Score", ascending=False, inplace=True)
+
+        # Standardize String Display for percentages without modifying text
+        if "Deal-In Rate" in df_mvp.columns:
+            df_mvp["Deal-In Rate"] = df_mvp["Deal-In Rate"].astype(str).apply(
                 lambda x: f"{x.strip().replace('%', '')}%" if x.strip() not in ["", "nan", "None"] else "0.00%"
             )
-            # Create pure numeric column for ranking metric card
             df_mvp["DealInRate_Num"] = (
-                df_mvp["DealInRate_Display"]
-                .astype(str)
+                df_mvp["Deal-In Rate"]
                 .str.replace("%", "", regex=False)
             )
             df_mvp["DealInRate_Num"] = pd.to_numeric(df_mvp["DealInRate_Num"], errors="coerce").fillna(0.0)
@@ -156,18 +149,12 @@ def calculate_leaders_and_mvp(df_mvp_raw):
             df_mvp["Deal-In Rate"] = "0.00%"
             df_mvp["DealInRate_Num"] = 0.0
 
-        for col in ["riichi", "tsumo", "ron"]:
-            if col in df_mvp.columns:
-                df_mvp[col] = pd.to_numeric(df_mvp[col], errors="coerce").fillna(0).astype(int)
-
-        if "MVP Score" in df_mvp.columns:
-            df_mvp["MVP Score"] = pd.to_numeric(df_mvp["MVP Score"], errors="coerce").fillna(0.0)
-            df_mvp.sort_values(by="MVP Score", ascending=False, inplace=True)
-
         df_mvp.reset_index(drop=True, inplace=True)
 
         if "Rank" not in df_mvp.columns:
             df_mvp["Rank"] = df_mvp.index + 1
+        else:
+            df_mvp["Rank"] = pd.to_numeric(df_mvp["Rank"], errors="coerce").fillna(df_mvp.index + 1).astype(int)
 
         return df_mvp
 
@@ -289,7 +276,7 @@ try:
         df_log = pd.DataFrame()
 
     try:
-        df_mvp_raw = pd.read_sql_query("SELECT * FROM mvp_log", conn)
+        df_mvp_raw = pd.read_sql_query("SELECT * FROM mvp_table", conn)
     except Exception:
         df_mvp_raw = pd.DataFrame()
 
@@ -297,7 +284,7 @@ try:
 
     # Calculate Full Standings & MVP Stats
     s2_leaderboard = calculate_standings_from_game_log(df_log)
-    df_mvp = calculate_leaders_and_mvp(df_mvp_raw)
+    df_mvp = load_raw_mvp_data(df_mvp_raw)
 
     east_df = (
         s2_leaderboard[s2_leaderboard["Conference"] == "East"]
@@ -347,29 +334,17 @@ try:
         # --- 👑 LEADING STATISTICS CARDS ---
         st.subheader("👑 League Category Leaders")
 
-        if not df_mvp.empty and "ron" in df_mvp.columns:
-            most_rons = df_mvp.sort_values(by="ron", ascending=False).iloc[0]
-            most_tsumos = df_mvp.sort_values(by="tsumo", ascending=False).iloc[0]
-            most_riichis = df_mvp.sort_values(by="riichi", ascending=False).iloc[0]
+        if not df_mvp.empty:
+            mvp_leader = df_mvp.iloc[0]
             least_dealins = df_mvp.sort_values(by="DealInRate_Num", ascending=True).iloc[0]
 
-            m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+            m_col1, m_col2 = st.columns(2)
             m_col1.metric(
-                "🀄 Most Rons",
-                f"{most_rons['Player']}",
-                f"{int(most_rons['ron'])} Wins",
+                "⭐ MVP Leader",
+                f"{mvp_leader['Player']}",
+                f"{mvp_leader['Score']:.1f} pts",
             )
             m_col2.metric(
-                "🌕 Most Tsumos",
-                f"{most_tsumos['Player']}",
-                f"{int(most_tsumos['tsumo'])} Wins",
-            )
-            m_col3.metric(
-                "⚡ Most Riichis",
-                f"{most_riichis['Player']}",
-                f"{int(most_riichis['riichi'])} Calls",
-            )
-            m_col4.metric(
                 "🛡️ Lowest Deal-In Rate",
                 f"{least_dealins['Player']}",
                 f"{least_dealins['Deal-In Rate']} Rate",
@@ -417,26 +392,24 @@ try:
 
             with tab_mvp:
                 if not df_mvp.empty:
-                    # Render exact string values as formatted in Google Sheet tab
-                    display_cols = [c for c in ["Rank", "Player", "MVP Score", "Deal-In Rate", "ron", "tsumo", "riichi"]
-                                    if c in df_mvp.columns]
                     st.dataframe(
-                        df_mvp[display_cols],
+                        df_mvp[["Rank", "Player", "Score", "Deal-In Rate"]],
                         use_container_width=True,
                         hide_index=True,
                         column_config={
                             "Rank": st.column_config.NumberColumn(format="%d"),
-                            "MVP Score": st.column_config.NumberColumn("MVP Score", format="%.1f pts"),
-                            "Deal-In Rate": st.column_config.TextColumn("Deal-In Rate"),
-                            "ron": st.column_config.NumberColumn("Rons", format="%d"),
-                            "tsumo": st.column_config.NumberColumn("Tsumos", format="%d"),
-                            "riichi": st.column_config.NumberColumn("Riichis", format="%d"),
+                            "Player": st.column_config.TextColumn("Player"),
+                            "Score": st.column_config.NumberColumn(
+                                "Score", format="%.1f"
+                            ),
+                            "Deal-In Rate": st.column_config.TextColumn(
+                                "Deal-In Rate"
+                            ),
                         },
                     )
                 else:
                     st.info(
-                        "⭐ MVP calculations will display here once Season 2"
-                        " hands are logged or MVP_LOG_URL is updated."
+                        "⭐ MVP standings will display here once MVP_URL is updated."
                     )
 
         with right_col:
